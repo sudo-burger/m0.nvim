@@ -118,6 +118,7 @@ function m.chatgpt()
 end
 
 function m.setup(user_config)
+	user_config = user_config or {}
 	config.default_model = make_openai(config["openai-0"])
 	config = vim.tbl_extend("force", config, user_config)
 end

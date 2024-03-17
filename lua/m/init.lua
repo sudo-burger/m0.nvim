@@ -1,4 +1,4 @@
-local m = {}
+local M = {}
 
 -- Util functions.
 
@@ -12,13 +12,13 @@ end
 
 -- local namespace = vim.api.nvim_create_namespace("m")
 
-function m.get_api_key(name)
+function M.get_api_key(name)
 	return vim.fn.system("echo -n $(pass " .. name .. ")")
 end
 
 -- Create an OpenAI completions handler.
 --
-function m.make_openai(params)
+function M.make_openai(params)
 	return {
 		run = function(messages)
 			local url = params.url
@@ -58,7 +58,7 @@ end
 local config = {
 	["openai-0"] = {
 		url = "https://api.openai.com/v1/chat/completions",
-		api_key = m.get_api_key("api.openai.com/key-0"),
+		api_key = M.get_api_key("api.openai.com/key-0"),
 		model = "gpt-3.5-turbo",
 		max_tokens = 100,
 		temperature = 0.7,
@@ -71,7 +71,7 @@ local config = {
 
 -- Exported functions.
 --
-function m.chatgpt()
+function M.chatgpt()
 	local conversation = vim.api.nvim_buf_get_lines(0, 0, -1, false)
 	local messages = {}
 	local section_mark = "====="
@@ -119,8 +119,8 @@ end
 
 function m.setup(user_config)
 	user_config = user_config or {}
-	config.default_model = m.make_openai(config["openai-0"])
+	config.default_model = M.make_openai(config["openai-0"])
 	config = vim.tbl_extend("force", config, user_config)
 end
 
-return m
+return M

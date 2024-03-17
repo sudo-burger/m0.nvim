@@ -17,12 +17,7 @@ local function insert_date()
 end
 
 -- Create a key mapping to trigger the date insertion
-vim.api.nvim_set_keymap(
-	"n",
-	"<C-d>",
-	':lua require("date_insert").insert_date()<CR>',
-	{ noremap = true, silent = true }
-)
+vim.api.nvim_set_keymap("n", "<C-d>", ':lua require("m").insert_date()<CR>', { noremap = true, silent = true })
 
 -- Return the public interface of the plugin
 return {

@@ -1,3 +1,5 @@
+local m = {}
+
 -- Util functions.
 
 local function split_lines(str)
@@ -65,6 +67,9 @@ local config = {
 }
 
 local function chatgpt()
+-- Exported functions.
+--
+function m.chatgpt()
 	local conversation = vim.api.nvim_buf_get_lines(0, 0, -1, false)
 	local messages = {}
 
@@ -108,7 +113,7 @@ local function chatgpt()
 	end
 end
 
-local function setup(user_config)
+function m.setup(user_config)
 	config = vim.tbl_extend("force", config, user_config)
 end
 

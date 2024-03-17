@@ -53,6 +53,14 @@ local function make_openai()
 	}
 end
 
+local function split_lines(str)
+	local lines = {}
+	for line in str:gmatch("([^\n]*)\n?") do
+		table.insert(lines, line)
+	end
+	return lines
+end
+
 local function chatgpt()
 	local conversation = vim.api.nvim_buf_get_lines(0, 0, -1, false)
 	local messages = {}
@@ -83,10 +91,10 @@ local function chatgpt()
 	local result = chat.run(messages)
 	if result.error then
 		vim.api.nvim_err_writeln("Error: " .. result.error.message)
-	elseif result then
+	elseif result.choices then
 		local reply = result.choices[1].message.content
 		vim.api.nvim_buf_set_lines(0, -1, -1, false, { "Assistant:" })
-		vim.api.nvim_buf_set_lines(0, -1, -1, false, { reply })
+		vim.api.nvim_buf_set_lines(0, -1, -1, false, split_lines(reply))
 	else
 		vim.api.nvim_err_writeln("Error: Unable to get response from OpenAI API")
 	end

@@ -14,7 +14,11 @@ local config = {
 	},
 }
 
+local function get_api_key(name)
+	return vim.fn.system("echo -n $(pass " .. name .. ")")
+end
 
+				"Authorization: Bearer " .. get_api_key("api.openai.com/key-0"),
 local function chatgpt()
 	local conversation = vim.api.nvim_buf_get_lines(0, 0, -1, false)
 	local messages = {}

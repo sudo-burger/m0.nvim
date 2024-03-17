@@ -1,25 +1,44 @@
--- Define the function to insert the current date
-local function insert_date()
-	local current_date = os.date("%Y-%m-%d")
-	local current_buffer = vim.api.nvim_get_current_buf()
-	local current_cursor = vim.api.nvim_win_get_cursor(0)
-	local row = current_cursor[1]
-	local col = current_cursor[2]
-	vim.api.nvim_buf_set_text(
-		current_buffer,
-		row - 1,
-		col,
-		row - 1,
-		col,
-		---@diagnostic disable-next-line: assign-type-mismatch
-		{ current_date }
-	)
+local api_key = vim.fn.system("echo -n $(pass api.openai.com/key-0)")
+local model = "gpt-3.5-turbo"
+
+local function chatgpt()
+	local conversation = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+	local prompt = table.concat(conversation, "\n")
+
+	local url = "https://api.openai.com/v1/chat/completions"
+	local headers = {
+		"Content-Type: application/json",
+		"Authorization: Bearer " .. api_key,
+	}
+	local data = {
+		model = model,
+		max_tokens = 100,
+		temperature = 0.7,
+		messages = {
+			{ role = "user", content = prompt },
+		},
+	}
+
+	local cmd = "curl -s '"
+		.. url
+		.. "' -H '"
+		.. headers[1]
+		.. "' -H '"
+		.. headers[2]
+		.. "' -d '"
+		.. vim.fn.json_encode(data)
+		.. "'"
+	print(cmd)
+	local response = vim.fn.system(cmd)
+	local result = vim.fn.json_decode(response)
+	if result then
+		local reply = result.choices[1].message.content
+		vim.api.nvim_buf_set_lines(0, -1, -1, false, { reply })
+	else
+		vim.api.nvim_err_writeln("Error: Unable to get response from OpenAI API")
+	end
 end
 
--- Create a key mapping to trigger the date insertion
-vim.api.nvim_set_keymap("n", "<C-d>", ':lua require("m").insert_date()<CR>', { noremap = true, silent = true })
-
--- Return the public interface of the plugin
 return {
-	insert_date = insert_date,
+	chatgpt = chatgpt,
 }

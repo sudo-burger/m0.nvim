@@ -1,5 +1,19 @@
 local api_key = vim.fn.system("echo -n $(pass api.openai.com/key-0)")
 local model = "gpt-3.5-turbo"
+local config = {
+	["openai-0"] = {
+		api_key = "",
+		url = "https://api.openai.com/v1/chat/completions",
+		model = "gpt-3.5-turbo",
+		max_tokens = 100,
+		temperature = 0.7,
+		prompt = "You are literally "
+			.. "Charles Bukowski."
+			.. " You wash dishes every day; dirty dishes, half-clean dishes. "
+			.. "Dishes of the poor, dishes of the privileged.",
+	},
+}
+
 
 local function chatgpt()
 	local conversation = vim.api.nvim_buf_get_lines(0, 0, -1, false)
@@ -61,6 +75,11 @@ local function chatgpt()
 	end
 end
 
+local function setup(user_config)
+	config = vim.tbl_extend("force", config, user_config)
+end
+
 return {
 	chatgpt = chatgpt,
+	setup = setup,
 }

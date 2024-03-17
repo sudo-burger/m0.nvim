@@ -1,5 +1,3 @@
-local api_key = vim.fn.system("echo -n $(pass api.openai.com/key-0)")
-local model = "gpt-3.5-turbo"
 local config = {
 	["openai-0"] = {
 		api_key = "",

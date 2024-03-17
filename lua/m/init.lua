@@ -18,7 +18,43 @@ local function get_api_key(name)
 	return vim.fn.system("echo -n $(pass " .. name .. ")")
 end
 
+-- Create an OpenAI completions handler.
+--
+local function make_openai()
+	return {
+		run = function(messages)
+			local url = "https://api.openai.com/v1/chat/completions"
+			local headers = {
+				"Content-Type: application/json",
 				"Authorization: Bearer " .. get_api_key("api.openai.com/key-0"),
+			}
+			local prompt = {
+				role = "system",
+				content = config["openai-0"].prompt,
+			}
+			table.insert(messages, 1, prompt)
+			local data = {
+				model = "gpt-3.5-turbo",
+				max_tokens = 100,
+				temperature = 0.7,
+				messages = messages,
+			}
+
+			local cmd = "curl -s "
+				.. vim.fn.shellescape(url)
+				.. " -H "
+				.. vim.fn.shellescape(headers[1])
+				.. " -H "
+				.. vim.fn.shellescape(headers[2])
+				.. " -d "
+				.. vim.fn.shellescape(vim.fn.json_encode(data))
+			print(cmd)
+			local response = vim.fn.system(cmd)
+			return vim.fn.json_decode(response)
+		end,
+	}
+end
+
 local function chatgpt()
 	local conversation = vim.api.nvim_buf_get_lines(0, 0, -1, false)
 	local messages = {}
@@ -45,32 +81,8 @@ local function chatgpt()
 			i = i + 1
 		end
 	end
-
-	local url = "https://api.openai.com/v1/chat/completions"
-	local headers = {
-		"Content-Type: application/json",
-		"Authorization: Bearer " .. api_key,
-	}
-	local data = {
-		model = model,
-		max_tokens = 100,
-		temperature = 0.7,
-		messages = messages,
-	}
-
-	local cmd = "curl -s '"
-		.. url
-		.. "' -H '"
-		.. headers[1]
-		.. "' -H '"
-		.. headers[2]
-		.. "' -d '"
-		.. vim.fn.json_encode(data)
-		.. "'"
-	print(cmd)
-	local response = vim.fn.system(cmd)
-	local result = vim.fn.json_decode(response)
-	if result then
+	local chat = make_openai()
+	local result = chat.run(messages)
 		local reply = result.choices[1].message.content
 		vim.api.nvim_buf_set_lines(0, -1, -1, false, { "Assistant:" })
 		vim.api.nvim_buf_set_lines(0, -1, -1, false, { reply })

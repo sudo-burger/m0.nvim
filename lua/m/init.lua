@@ -81,6 +81,9 @@ local function chatgpt()
 	end
 	local chat = make_openai()
 	local result = chat.run(messages)
+	if result.error then
+		vim.api.nvim_err_writeln("Error: " .. result.error.message)
+	elseif result then
 		local reply = result.choices[1].message.content
 		vim.api.nvim_buf_set_lines(0, -1, -1, false, { "Assistant:" })
 		vim.api.nvim_buf_set_lines(0, -1, -1, false, { reply })

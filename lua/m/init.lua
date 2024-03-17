@@ -66,26 +66,30 @@ local function chatgpt()
 	local messages = {}
 
 	local i = 1
+	local role = {
+		"user",
+		"assistant",
+	}
+	local role_idx = 1
 	while i <= #conversation do
-		if conversation[i]:sub(1, 5) == "User:" then
-			local user_message = { role = "user", content = "" }
+		-- Switch between roles.
+		if conversation[i]:sub(1, 5) == "=====" then
 			i = i + 1
-			while i <= #conversation and conversation[i]:sub(1, 10) ~= "Assistant:" do
-				user_message.content = user_message.content .. conversation[i] .. "\n"
-				i = i + 1
+			if role_idx == 1 then
+				role_idx = 2
+			else
+				role_idx = 1
 			end
-			messages[#messages + 1] = user_message
-		elseif conversation[i]:sub(1, 10) == "Assistant:" then
-			local assistant_message = { role = "assistant", content = "" }
-			i = i + 1
-			while i <= #conversation and conversation[i]:sub(1, 5) ~= "User:" do
-				assistant_message.content = assistant_message.content .. conversation[i] .. "\n"
-				i = i + 1
-			end
-			messages[#messages + 1] = assistant_message
-		else
+		end
+
+		local message = { role = role[role_idx], content = "" }
+
+		while i <= #conversation and conversation[i]:sub(1, 5) ~= "=====" do
+			message.content = message.content .. conversation[i] .. "\n"
 			i = i + 1
 		end
+
+		table.insert(messages, message)
 	end
 	local chat = make_openai()
 	local result = chat.run(messages)
@@ -93,8 +97,9 @@ local function chatgpt()
 		vim.api.nvim_err_writeln("Error: " .. result.error.message)
 	elseif result.choices then
 		local reply = result.choices[1].message.content
-		vim.api.nvim_buf_set_lines(0, -1, -1, false, { "Assistant:" })
+		vim.api.nvim_buf_set_lines(0, -1, -1, false, { "=====" })
 		vim.api.nvim_buf_set_lines(0, -1, -1, false, split_lines(reply))
+		vim.api.nvim_buf_set_lines(0, -1, -1, false, { "=====" })
 	else
 		vim.api.nvim_err_writeln("Error: Unable to get response from OpenAI API")
 	end

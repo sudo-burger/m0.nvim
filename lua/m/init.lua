@@ -1,16 +1,13 @@
-local config = {
-	["openai-0"] = {
-		api_key = "",
-		url = "https://api.openai.com/v1/chat/completions",
-		model = "gpt-3.5-turbo",
-		max_tokens = 100,
-		temperature = 0.7,
-		prompt = "You are literally "
-			.. "Charles Bukowski."
-			.. " You wash dishes every day; dirty dishes, half-clean dishes. "
-			.. "Dishes of the poor, dishes of the privileged.",
-	},
-}
+-- Util functions.
+
+local function split_lines(str)
+	local lines = {}
+	for line in str:gmatch("([^\n]*)\n?") do
+		table.insert(lines, line)
+	end
+	return lines
+end
+
 
 local function get_api_key(name)
 	return vim.fn.system("echo -n $(pass " .. name .. ")")
@@ -53,13 +50,19 @@ local function make_openai()
 	}
 end
 
-local function split_lines(str)
-	local lines = {}
-	for line in str:gmatch("([^\n]*)\n?") do
-		table.insert(lines, line)
-	end
-	return lines
-end
+local config = {
+	["openai-0"] = {
+		url = "https://api.openai.com/v1/chat/completions",
+		api_key = get_api_key("api.openai.com/key-0"),
+		model = "gpt-3.5-turbo",
+		max_tokens = 100,
+		temperature = 0.7,
+		prompt = "You are literally "
+			.. "Charles Bukowski."
+			.. " You wash dishes every day; dirty dishes, half-clean dishes. "
+			.. "Dishes of the poor, dishes of the privileged.",
+	},
+}
 
 local function chatgpt()
 	local conversation = vim.api.nvim_buf_get_lines(0, 0, -1, false)

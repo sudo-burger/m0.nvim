@@ -3,7 +3,30 @@ local model = "gpt-3.5-turbo"
 
 local function chatgpt()
 	local conversation = vim.api.nvim_buf_get_lines(0, 0, -1, false)
-	local prompt = table.concat(conversation, "\n")
+	local messages = {}
+
+	local i = 1
+	while i <= #conversation do
+		if conversation[i]:sub(1, 5) == "User:" then
+			local user_message = { role = "user", content = "" }
+			i = i + 1
+			while i <= #conversation and conversation[i]:sub(1, 10) ~= "Assistant:" do
+				user_message.content = user_message.content .. conversation[i] .. "\n"
+				i = i + 1
+			end
+			messages[#messages + 1] = user_message
+		elseif conversation[i]:sub(1, 10) == "Assistant:" then
+			local assistant_message = { role = "assistant", content = "" }
+			i = i + 1
+			while i <= #conversation and conversation[i]:sub(1, 5) ~= "User:" do
+				assistant_message.content = assistant_message.content .. conversation[i] .. "\n"
+				i = i + 1
+			end
+			messages[#messages + 1] = assistant_message
+		else
+			i = i + 1
+		end
+	end
 
 	local url = "https://api.openai.com/v1/chat/completions"
 	local headers = {
@@ -14,9 +37,7 @@ local function chatgpt()
 		model = model,
 		max_tokens = 100,
 		temperature = 0.7,
-		messages = {
-			{ role = "user", content = prompt },
-		},
+		messages = messages,
 	}
 
 	local cmd = "curl -s '"
@@ -33,6 +54,7 @@ local function chatgpt()
 	local result = vim.fn.json_decode(response)
 	if result then
 		local reply = result.choices[1].message.content
+		vim.api.nvim_buf_set_lines(0, -1, -1, false, { "Assistant:" })
 		vim.api.nvim_buf_set_lines(0, -1, -1, false, { reply })
 	else
 		vim.api.nvim_err_writeln("Error: Unable to get response from OpenAI API")

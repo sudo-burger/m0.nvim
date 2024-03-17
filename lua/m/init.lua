@@ -1,17 +1,6 @@
 local M = {}
 
 -- Util functions.
-
-local function split_lines(str)
-	local lines = {}
-	for line in str:gmatch("([^\n]*)\n?") do
-		table.insert(lines, line)
-	end
-	return lines
-end
-
--- local namespace = vim.api.nvim_create_namespace("m")
-
 function M.get_api_key(name)
 	return vim.fn.system("echo -n $(pass " .. name .. ")")
 end
@@ -110,14 +99,14 @@ function M.chatgpt()
 	elseif result.choices then
 		local reply = result.choices[1].message.content
 		vim.api.nvim_buf_set_lines(0, -1, -1, false, { section_mark })
-		vim.api.nvim_buf_set_lines(0, -1, -1, false, split_lines(reply))
+		vim.api.nvim_buf_set_lines(0, -1, -1, false, vim.fn.split(reply, "\n"))
 		vim.api.nvim_buf_set_lines(0, -1, -1, false, { section_mark })
 	else
 		vim.api.nvim_err_writeln("Error: Unable to get response from OpenAI API")
 	end
 end
 
-function m.setup(user_config)
+function M.setup(user_config)
 	user_config = user_config or {}
 	config.default_model = M.make_openai(config["openai-0"])
 	config = vim.tbl_extend("force", config, user_config)

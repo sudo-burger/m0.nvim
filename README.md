@@ -1,6 +1,6 @@
 # m0.nvim
 ## Introduction
-Yet another Neovim plugin with LLMs.
+Yet another Neovim plugin interacting with LLMs.
 
 Aims:
 * Easily configure several backends.

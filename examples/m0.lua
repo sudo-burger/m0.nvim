@@ -2,7 +2,7 @@ return {
 	"sudo-burger/m0.nvim",
 	cmd = { "M0chat" },
 	init = function()
-		vim.keymap.set("n", "<leader>x", require("m0").M0chat, { desc = "m0.nvim" })
+		vim.keymap.set("n", "<leader>x", require("m0").M0chat, { desc = "M0chat" })
 	end,
 	config = function()
 		require("m0").setup({

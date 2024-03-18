@@ -1,16 +1,16 @@
 # m0.nvim
 ## Introduction
-Yet another plugin to interact with LLMs from Neovim.
-
-Currently supported APIs:
-* OpenAI: completions (https://platform.openai.com/docs/api-reference/making-requests)
-* Anthropic: messages (https://docs.anthropic.com/claude/reference/messages_post)
+Yet another Neovim plugin with LLMs.
 
 Aims:
 * Easily configure several backends.
 * Eeasily switch between backends, even mid-conversation.
 * Minimal codebase.
 * Learn some Lua, have fun.
+
+Currently supported APIs:
+* OpenAI: completions (https://platform.openai.com/docs/api-reference/making-requests)
+* Anthropic: messages (https://docs.anthropic.com/claude/reference/messages_post)
 
 ## Installation
 See the example Lazy configuration in `examples/m0.lua`.

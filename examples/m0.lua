@@ -24,7 +24,7 @@ return {
 					model = "claude-3-haiku-20240307",
 					max_tokens = 100,
 					temperature = 0.7,
-					prompt = "Assume the role or Marilyn Monroe.",
+					prompt = "Assume the role of Marilyn Monroe.",
 				},
 			},
 			default_backend = "Charles Bukowski",

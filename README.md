@@ -14,3 +14,10 @@ Aims:
 
 ## Installation
 See the example Lazy configuration in 'examples/m0.lua'.
+
+## Usage
+Call M0chat to send the contents of the current buffer.
+
+Sections surrounded by '=====' will be interpreted as assistant answers.
+
+Send an argument to M0chat at any time in order to switch between the configured backends.

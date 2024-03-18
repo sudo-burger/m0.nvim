@@ -6,12 +6,14 @@ function M.get_api_key(name)
 	return vim.fn.system("echo -n $(pass " .. name .. ")")
 end
 
--- Create an Anthropic handler.
+-- Generic backend.
+-- Args:
+--    backend: "anthropic" | "openai"
+--    params: configuration table.
 --
 local function make_backend(backend, params)
 	if backend == nil or params == nil then
-		Print("No configuration. Bailing out.")
-		return {}
+		error("No configuration. Bailing out.")
 	end
 	return {
 		run = function(messages)
@@ -34,8 +36,7 @@ local function make_backend(backend, params)
 				}
 				table.insert(messages, 1, prompt)
 			else
-				print("Unknown backend: " .. backend)
-				return {}
+				error("Unknown backend: " .. backend, 2)
 			end
 
 			local cmd = "curl -s "
@@ -53,7 +54,6 @@ local function make_backend(backend, params)
 					.. vim.fn.shellescape("anthropic-version: " .. (params.anthropic_version or "2023-06-01"))
 			end
 
-			print(cmd)
 			local response = vim.fn.system(cmd)
 			local json_response = vim.fn.json_decode(response)
 
@@ -74,6 +74,12 @@ local function make_backend(backend, params)
 	}
 end
 
+local config = {}
+
+-- Exported functions.
+--
+
+-- backend constructors.
 function M.make_openai(params)
 	return make_backend("openai", params)
 end
@@ -82,37 +88,6 @@ function M.make_anthropic(params)
 	return make_backend("anthropic", params)
 end
 
-local config = {
-	backends = {
-		["openai-0"] = {
-			type = "openai",
-			url = "https://api.openai.com/v1/chat/completions",
-			api_key = M.get_api_key("api.openai.com/key-0"),
-			model = "gpt-3.5-turbo",
-			max_tokens = 100,
-			temperature = 0.7,
-			prompt = "You are literally "
-				.. "Charles Bukowski."
-				.. " You wash dishes every day; dirty dishes, half-clean dishes. "
-				.. "Dishes of the poor, dishes of the privileged.",
-		},
-		["anthropic-0"] = {
-			type = "anthropic",
-			url = "https://api.anthropic.com/v1/messages",
-			api_key = M.get_api_key("api.anthropic.com/key-0"),
-			anthropic_version = "2023-06-01",
-			-- model = "claude-3-opus-20240229",
-			model = "claude-3-haiku-20240307",
-			max_tokens = 100,
-			temperature = 0.7,
-			prompt = "You are literally Marilyn Monroe.",
-		},
-	},
-	default_backend = "anthropic-0",
-}
-
--- Exported functions.
---
 function M.M0chat(backend)
 	local conversation = vim.api.nvim_buf_get_lines(0, 0, -1, false)
 	local messages = {}
@@ -146,7 +121,6 @@ function M.M0chat(backend)
 		table.insert(messages, message)
 	end
 
-	print("Current_backend: " .. Current_backend)
 	local chat = make_backend(config.backends[Current_backend].type, config.backends[Current_backend])
 	local result = chat.run(messages)
 	if result.error then

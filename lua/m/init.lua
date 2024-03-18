@@ -7,85 +7,77 @@ end
 
 -- Create an Anthropic handler.
 --
-function M.make_anthropic(params)
+local function make_backend(backend, params)
 	return {
 		run = function(messages)
-			local url = params.url
-			local headers = {
-				"Content-Type: application/json",
-				"x-api-key: " .. params.api_key,
-				"anthropic-version: " .. (params.anthropic_version or "2023-06-01"),
-			}
 			local data = {
 				model = params.model,
-				system = params.prompt,
 				max_tokens = params.max_tokens,
 				temperature = params.temperature,
 				messages = messages,
 			}
+			local auth_param = ""
+
+			print("L0")
+			if backend == "anthropic" then
+				auth_param = "x-api-key: " .. (params.api_key or "")
+				data.system = params.prompt or ""
+			elseif backend == "openai" then
+				auth_param = "Authorization: Bearer " .. (params.api_key or "")
+				local prompt = {
+					role = "system",
+					content = params.prompt or "",
+				}
+				table.insert(messages, 1, prompt)
+			else
+				print("Unknown backend: " .. backend)
+				return {}
+			end
+			print("L1")
 
 			local cmd = "curl -s "
-				.. vim.fn.shellescape(url)
-				.. " -H "
-				.. vim.fn.shellescape(headers[1])
-				.. " -H "
-				.. vim.fn.shellescape(headers[2])
-				.. " -H "
-				.. vim.fn.shellescape(headers[3])
+				.. vim.fn.shellescape(params.url or "https://example.com")
 				.. " -d "
 				.. vim.fn.shellescape(vim.fn.json_encode(data))
+				.. " -H "
+				.. vim.fn.shellescape("Content-Type: application/json")
+				.. " -H "
+				.. vim.fn.shellescape(auth_param)
+
+			print("L2")
+			if backend == "anthropic" then
+				cmd = cmd
+					.. " -H "
+					.. vim.fn.shellescape("anthropic-version: " .. (params.anthropic_version or "2023-06-01"))
+			end
+
 			print(cmd)
 			local response = vim.fn.system(cmd)
 			local json_response = vim.fn.json_decode(response)
-			return {
-				error = json_response.error,
-				reply = json_response.content[1].text,
-			}
+
+			local ret = {}
+			if backend == "anthropic" then
+				ret = {
+					error = json_response.error,
+					reply = json_response.content[1].text,
+				}
+			elseif backend == "openai" then
+				ret = {
+					error = json_response.error,
+					reply = json_response.choices[1].message.content,
+				}
+			end
+			return ret
 		end,
 	}
 end
 
--- Create an OpenAI completions handler.
---
 function M.make_openai(params)
-	return {
-		run = function(messages)
-			local url = params.url
-			local headers = {
-				"Content-Type: application/json",
-				"Authorization: Bearer " .. params.api_key,
-			}
-			local prompt = {
-				role = "system",
-				content = params.prompt,
-			}
+	return make_backend("openai", params)
+end
 
-			table.insert(messages, 1, prompt)
-
-			local data = {
-				model = params.model,
-				max_tokens = params.max_tokens,
-				temperature = params.temperature,
-				messages = messages,
-			}
-
-			local cmd = "curl -s "
-				.. vim.fn.shellescape(url)
-				.. " -H "
-				.. vim.fn.shellescape(headers[1])
-				.. " -H "
-				.. vim.fn.shellescape(headers[2])
-				.. " -d "
-				.. vim.fn.shellescape(vim.fn.json_encode(data))
-			print(cmd)
-			local response = vim.fn.system(cmd)
-			local json_response = vim.fn.json_decode(response)
-			return {
-				error = json_response.error,
-				reply = json_response.choices[1].message.content,
-			}
-		end,
-	}
+function M.make_anthropic(params)
+	return make_backend("anthropic", params)
 end
 
 local config = {

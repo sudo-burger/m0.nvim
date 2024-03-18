@@ -13,7 +13,7 @@ Aims:
 * Learn some Lua, have fun.
 
 ## Installation
-See the example Lazy configuration in 'examples/m0.lua'.
+See the example Lazy configuration in `examples/m0.lua`.
 
 ## Usage
 Call M0chat to send the contents of the current buffer.

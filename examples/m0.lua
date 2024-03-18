@@ -2,7 +2,7 @@ return {
 	"sudo-burger/m0.nvim",
 	cmd = { "Mchat" },
 	config = function()
-		vim.keymap.set("n", "<C-d>", require("m").Mchat, { desc = "m.nvim" })
+		vim.keymap.set("n", "<C-d>", require("m0").Mchat, { desc = "m0.nvim" })
 		-- require("m").setup({ default_backend = "openai-0" })
 		-- default_backend = require('m').make_openai {
 		--   url = 'https://api.openai.com/v1/chat/completions',

@@ -1,4 +1,5 @@
 local M = {}
+Current_backend = ""
 
 -- Util functions.
 function M.get_api_key(name)
@@ -8,6 +9,10 @@ end
 -- Create an Anthropic handler.
 --
 local function make_backend(backend, params)
+	if backend == nil or params == nil then
+		Print("No configuration. Bailing out.")
+		return {}
+	end
 	return {
 		run = function(messages)
 			local data = {
@@ -18,7 +23,6 @@ local function make_backend(backend, params)
 			}
 			local auth_param = ""
 
-			print("L0")
 			if backend == "anthropic" then
 				auth_param = "x-api-key: " .. (params.api_key or "")
 				data.system = params.prompt or ""
@@ -33,7 +37,6 @@ local function make_backend(backend, params)
 				print("Unknown backend: " .. backend)
 				return {}
 			end
-			print("L1")
 
 			local cmd = "curl -s "
 				.. vim.fn.shellescape(params.url or "https://example.com")
@@ -44,7 +47,6 @@ local function make_backend(backend, params)
 				.. " -H "
 				.. vim.fn.shellescape(auth_param)
 
-			print("L2")
 			if backend == "anthropic" then
 				cmd = cmd
 					.. " -H "
@@ -59,12 +61,12 @@ local function make_backend(backend, params)
 			if backend == "anthropic" then
 				ret = {
 					error = json_response.error,
-					reply = json_response.content[1].text,
+					reply = (json_response.content[1].text or ""),
 				}
 			elseif backend == "openai" then
 				ret = {
 					error = json_response.error,
-					reply = json_response.choices[1].message.content,
+					reply = (json_response.choices[1].message.content or ""),
 				}
 			end
 			return ret
@@ -83,6 +85,7 @@ end
 local config = {
 	backends = {
 		["openai-0"] = {
+			type = "openai",
 			url = "https://api.openai.com/v1/chat/completions",
 			api_key = M.get_api_key("api.openai.com/key-0"),
 			model = "gpt-3.5-turbo",
@@ -94,6 +97,7 @@ local config = {
 				.. "Dishes of the poor, dishes of the privileged.",
 		},
 		["anthropic-0"] = {
+			type = "anthropic",
 			url = "https://api.anthropic.com/v1/messages",
 			api_key = M.get_api_key("api.anthropic.com/key-0"),
 			anthropic_version = "2023-06-01",
@@ -109,10 +113,11 @@ local config = {
 
 -- Exported functions.
 --
-function M.Mchat()
+function M.M0chat(backend)
 	local conversation = vim.api.nvim_buf_get_lines(0, 0, -1, false)
 	local messages = {}
 	local section_mark = "====="
+	Current_backend = (backend or Current_backend)
 
 	local i = 1
 	local role = {
@@ -121,7 +126,7 @@ function M.Mchat()
 	}
 	local role_idx = 1
 	while i <= #conversation do
-		-- Switch between roles.
+		-- Switch between roles when meeting a section mark in the conversattion.
 		if conversation[i]:sub(1, 5) == section_mark then
 			i = i + 1
 			if role_idx == 1 then
@@ -141,12 +146,16 @@ function M.Mchat()
 		table.insert(messages, message)
 	end
 
-	-- local chat = M.make_openai(config.backends[config.default_backend])
-	local chat = M.make_anthropic(config.backends[config.default_backend])
+	print("Current_backend: " .. Current_backend)
+	local chat = make_backend(config.backends[Current_backend].type, config.backends[Current_backend])
 	local result = chat.run(messages)
 	if result.error then
 		vim.api.nvim_err_writeln("Error: " .. result.error.message)
 	elseif result.reply then
+		-- Build and print the reply in the current buffer.
+		-- The reply is enclosed in "section_marks".
+		-- The section marks are also used to distinguish between
+		-- user and assistant input when building the API calls.
 		vim.api.nvim_buf_set_lines(0, -1, -1, false, { section_mark })
 		vim.api.nvim_buf_set_lines(0, -1, -1, false, vim.fn.split(result.reply, "\n"))
 		vim.api.nvim_buf_set_lines(0, -1, -1, false, { section_mark })
@@ -158,8 +167,23 @@ end
 function M.setup(user_config)
 	user_config = user_config or {}
 	config = vim.tbl_extend("force", config, user_config)
+	Current_backend = config.default_backend
+	if config.backends[Current_backend] == nil then
+		error("Current_backend (" .. Current_backend .. ") set to non-existing configuration.", 2)
+	end
 end
 
-vim.api.nvim_create_user_command("Mchat", M.Mchat, {})
+vim.api.nvim_create_user_command("M0chat", function(opts)
+	M.M0chat(opts.args)
+end, {
+	nargs = 1,
+	complete = function()
+		local ret = {}
+		for k, _ in pairs(config.backends) do
+			table.insert(ret, k)
+		end
+		return ret
+	end,
+})
 
 return M

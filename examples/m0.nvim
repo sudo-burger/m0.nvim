@@ -1,6 +1,6 @@
 return {
 	{
-		"sudo-burger/m.nvim",
+		"sudo-burger/m0.nvim",
 		cmd = { "Mchat" },
 		config = function()
 			vim.keymap.set("n", "<C-d>", require("m").Mchat, { desc = "m.nvim" })

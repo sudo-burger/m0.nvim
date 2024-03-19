@@ -1,5 +1,12 @@
 local M = {}
+local config = {
+	backends = {},
+	default_backend = "",
+	prompts = {},
+	default_prompt = "",
+}
 Current_backend = ""
+Current_prompt = ""
 
 -- Util functions.
 function M.get_api_key(name)
@@ -23,18 +30,15 @@ local function make_backend(backend, params)
 				temperature = params.temperature,
 				messages = messages,
 			}
+			local prompt = (config.prompts[Current_prompt] or "")
 			local auth_param = ""
 
 			if backend == "anthropic" then
 				auth_param = "x-api-key: " .. (params.api_key or "")
-				data.system = params.prompt or ""
+				data.system = prompt
 			elseif backend == "openai" then
 				auth_param = "Authorization: Bearer " .. (params.api_key or "")
-				local prompt = {
-					role = "system",
-					content = params.prompt or "",
-				}
-				table.insert(messages, 1, prompt)
+				table.insert(messages, 1, { role = "system", content = prompt })
 			else
 				error("Unknown backend: " .. backend, 2)
 			end
@@ -47,6 +51,7 @@ local function make_backend(backend, params)
 				.. vim.fn.shellescape("Content-Type: application/json")
 				.. " -H "
 				.. vim.fn.shellescape(auth_param)
+			print(cmd)
 
 			if backend == "anthropic" then
 				cmd = cmd
@@ -74,8 +79,6 @@ local function make_backend(backend, params)
 	}
 end
 
-local config = {}
-
 -- Exported functions.
 --
 
@@ -88,11 +91,24 @@ function M.make_anthropic(params)
 	return make_backend("anthropic", params)
 end
 
-function M.M0chat(backend)
+function M.M0backend(backend)
+	if backend ~= nil and backend ~= "" then
+		Current_backend = backend
+	end
+	print("Backend: " .. Current_backend)
+end
+
+function M.M0prompt(prompt)
+	if prompt ~= nil and prompt ~= "" then
+		Current_prompt = prompt
+	end
+	print("Prompt: " .. Current_prompt)
+end
+
+function M.M0chat()
 	local conversation = vim.api.nvim_buf_get_lines(0, 0, -1, false)
 	local messages = {}
 	local section_mark = "====="
-	Current_backend = (backend or Current_backend)
 
 	local i = 1
 	local role = {
@@ -145,10 +161,26 @@ function M.setup(user_config)
 	if config.backends[Current_backend] == nil then
 		error("Current_backend (" .. Current_backend .. ") set to non-existing configuration.", 2)
 	end
+	Current_prompt = config.default_prompt
+	if config.prompts[Current_prompt] == nil then
+		error("Current_prompt (" .. Current_prompt .. ") set to non-existing configuration.", 2)
+	end
 end
 
-vim.api.nvim_create_user_command("M0chat", function(opts)
-	M.M0chat(opts.args)
+vim.api.nvim_create_user_command("M0prompt", function(opts)
+	M.M0prompt(opts.args)
+end, {
+	nargs = 1,
+	complete = function()
+		local ret = {}
+		for k, _ in pairs(config.prompts) do
+			table.insert(ret, k)
+		end
+		return ret
+	end,
+})
+vim.api.nvim_create_user_command("M0backend", function(opts)
+	M.M0backend(opts.args)
 end, {
 	nargs = 1,
 	complete = function()
@@ -159,5 +191,9 @@ end, {
 		return ret
 	end,
 })
+
+vim.api.nvim_create_user_command("M0chat", function()
+	M.M0chat()
+end, { nargs = 0 })
 
 return M

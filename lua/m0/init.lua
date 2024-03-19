@@ -62,17 +62,13 @@ local function make_backend(backend, params)
 			local response = vim.fn.system(cmd)
 			local json_response = vim.fn.json_decode(response)
 
-			local ret = {}
+			local ret = {
+				error = json_response.error,
+			}
 			if backend == "anthropic" then
-				ret = {
-					error = json_response.error,
-					reply = (json_response.content[1].text or ""),
-				}
+				ret.reply = (json_response.content[1].text or "")
 			elseif backend == "openai" then
-				ret = {
-					error = json_response.error,
-					reply = (json_response.choices[1].message.content or ""),
-				}
+				ret.reply = (json_response.choices[1].message.content or "")
 			end
 			return ret
 		end,
@@ -179,6 +175,7 @@ end, {
 		return ret
 	end,
 })
+
 vim.api.nvim_create_user_command("M0backend", function(opts)
 	M.M0backend(opts.args)
 end, {

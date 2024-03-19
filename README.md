@@ -3,7 +3,7 @@
 Yet another Neovim plugin interacting with LLMs.
 
 Aims:
-* Easily configure several backends.
+* Easily configure any number of LLM backends and prompts.
 * Eeasily switch backends and prompts, even mid-conversation.
 * Minimal codebase.
 * Learn some Lua, have fun.

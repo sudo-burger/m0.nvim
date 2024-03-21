@@ -9,6 +9,7 @@ local Defaults = {
   openai_url = 'https://api.openai.com/v1/chat/completions',
   antrhopic_url = 'https://api.anthropic.com/v1/messages',
   anthropic_version = '2023-06-01',
+  max_tokens = 512,
 }
 local Current_backend = ''
 local Current_prompt = ''
@@ -35,19 +36,15 @@ local function make_backend(backend, params)
     run = function(messages)
       -- Build the payload (or "data" in curl parlance).
       -- Mandatory:
-      -- - model (the user configuration is expected to set this; there is no default).
-      -- - messages
-      -- Optional:
       -- - max_tokens
+      -- - messages
+      -- - model (the user configuration is expected to set this; there is no default).
+      -- Optional:
       -- - temperature
-      -- - prompt (openAI only)
+      -- - prompt (note that Anthropic and OpenAI place this differently in the API calls).
       local data = {}
-      if params.model then
-        data.model = params.model
-      end
-      if params.max_tokens then
-        data.max_tokens = params.max_tokens
-      end
+      data.max_tokens = (params.max_tokens or Defaults.max_tokens)
+      data.model = (params.model or '')
       if params.temperature then
         data.temperature = params.temperature
       end
@@ -96,7 +93,9 @@ local function make_backend(backend, params)
       local ret = {
         error = json_response.error,
       }
-      if backend == 'anthropic' then
+      if ret.error then
+        return ret
+      elseif backend == 'anthropic' then
         ret.reply = (json_response.content[1].text or '')
       elseif backend == 'openai' then
         ret.reply = (json_response.choices[1].message.content or '')

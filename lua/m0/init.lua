@@ -1,5 +1,5 @@
 local M = {}
-local config = {
+local Config = {
 	backends = {},
 	default_backend = "",
 	prompts = {},
@@ -151,7 +151,7 @@ function M.M0chat()
 		table.insert(messages, message)
 	end
 
-	local chat = make_backend(config.backends[Current_backend].type, config.backends[Current_backend])
+	local chat = make_backend(Config.backends[Current_backend].type, Config.backends[Current_backend])
 	local result = chat.run(messages)
 	if result.error then
 		vim.api.nvim_err_writeln("Error: " .. result.error.message)
@@ -170,13 +170,13 @@ end
 
 function M.setup(user_config)
 	user_config = user_config or {}
-	config = vim.tbl_extend("force", config, user_config)
-	Current_backend = config.default_backend
-	if config.backends[Current_backend] == nil then
+	Config = vim.tbl_extend("force", Config, user_config)
+	Current_backend = Config.default_backend
+	if Config.backends[Current_backend] == nil then
 		error("Current_backend (" .. Current_backend .. ") set to non-existing configuration.", 2)
 	end
-	Current_prompt = config.default_prompt
-	if config.prompts[Current_prompt] == nil then
+	Current_prompt = Config.default_prompt
+	if Config.prompts[Current_prompt] == nil then
 		error("Current_prompt (" .. Current_prompt .. ") set to non-existing configuration.", 2)
 	end
 end
@@ -187,7 +187,7 @@ end, {
 	nargs = 1,
 	complete = function()
 		local ret = {}
-		for k, _ in pairs(config.prompts) do
+		for k, _ in pairs(Config.prompts) do
 			table.insert(ret, k)
 		end
 		return ret
@@ -200,7 +200,7 @@ end, {
 	nargs = 1,
 	complete = function()
 		local ret = {}
-		for k, _ in pairs(config.backends) do
+		for k, _ in pairs(Config.backends) do
 			table.insert(ret, k)
 		end
 		return ret

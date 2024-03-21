@@ -33,6 +33,14 @@ local function make_backend(backend, params)
 	end
 	return {
 		run = function(messages)
+			-- Build the payload (or "data" in curl parlance).
+			-- Mandatory:
+			-- - model (the user configuration is expected to set this; there is no default).
+			-- - messages
+			-- Optional:
+			-- - max_tokens
+			-- - temperature
+			-- - prompt (openAI only)
 			local data = {}
 			if params.model then
 				data.model = params.model

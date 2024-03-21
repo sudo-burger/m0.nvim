@@ -7,10 +7,14 @@ local config = {
 }
 Current_backend = ""
 Current_prompt = ""
+local API_keys = {}
 
 -- Util functions.
 function M.get_api_key(name)
-	return vim.fn.system("echo -n $(pass " .. name .. ")")
+	if API_keys[name] ~= nil then
+		API_keys[name] = vim.fn.system("echo -n $(pass " .. name .. ")")
+	end
+	return API_keys[name]
 end
 
 -- Generic backend.

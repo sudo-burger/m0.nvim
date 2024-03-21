@@ -70,7 +70,6 @@ local function make_backend(backend, params)
 				.. vim.fn.shellescape(auth_param)
 				.. " -H "
 				.. vim.fn.shellescape("Content-Type: application/json")
-			print(cmd)
 
 			if backend == "anthropic" then
 				cmd = cmd

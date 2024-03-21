@@ -5,6 +5,12 @@ local config = {
 	prompts = {},
 	default_prompt = "",
 }
+local OpenAI_defaults = {
+	url = "https://api.openai.com/v1/chat/completions",
+}
+local Anthropic_defaults = {
+	url = "https://api.anthropic.com/v1/messages",
+}
 local Current_backend = ""
 local Current_prompt = ""
 local API_keys = {}
@@ -28,33 +34,43 @@ local function make_backend(backend, params)
 	end
 	return {
 		run = function(messages)
-			local data = {
-				model = params.model,
-				max_tokens = params.max_tokens,
-				temperature = params.temperature,
-				messages = messages,
-			}
+			local data = {}
+			if params.model then
+				data.model = params.model
+			end
+			if params.max_tokens then
+				data.max_tokens = params.max_tokens
+			end
+			if params.temperature then
+				data.temperature = params.temperature
+			end
+			data.messages = messages
+
 			local prompt = (config.prompts[Current_prompt] or "")
 			local auth_param = ""
+			local url = ""
 
 			if backend == "anthropic" then
 				auth_param = "x-api-key: " .. (params.api_key or "")
 				data.system = prompt
+				url = params.url or Anthropic_defaults.url
 			elseif backend == "openai" then
 				auth_param = "Authorization: Bearer " .. (params.api_key or "")
 				table.insert(messages, 1, { role = "system", content = prompt })
+				url = params.url or OpenAI_defaults.url
 			else
 				error("Unknown backend: " .. backend, 2)
 			end
 
 			local cmd = "curl -s "
-				.. vim.fn.shellescape(params.url or "https://example.com")
+				.. vim.fn.shellescape(url)
 				.. " -d "
 				.. vim.fn.shellescape(vim.fn.json_encode(data))
 				.. " -H "
-				.. vim.fn.shellescape("Content-Type: application/json")
-				.. " -H "
 				.. vim.fn.shellescape(auth_param)
+				.. " -H "
+				.. vim.fn.shellescape("Content-Type: application/json")
+			print(cmd)
 
 			if backend == "anthropic" then
 				cmd = cmd

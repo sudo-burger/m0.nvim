@@ -5,11 +5,10 @@ local Config = {
 	prompts = {},
 	default_prompt = "",
 }
-local OpenAI_defaults = {
-	url = "https://api.openai.com/v1/chat/completions",
-}
-local Anthropic_defaults = {
-	url = "https://api.anthropic.com/v1/messages",
+local Defaults = {
+	openai_url = "https://api.openai.com/v1/chat/completions",
+	antrhopic_url = "https://api.anthropic.com/v1/messages",
+	anthropic_version = "2023-06-01",
 }
 local Current_backend = ""
 local Current_prompt = ""
@@ -46,18 +45,20 @@ local function make_backend(backend, params)
 			end
 			data.messages = messages
 
-			local prompt = (config.prompts[Current_prompt] or "")
+			local prompt = (Config.prompts[Current_prompt] or "")
 			local auth_param = ""
 			local url = ""
 
+			-- Authorization, prompt, and message structure differ slightly
+			-- between the Anthropic and OpenAI APIs.
 			if backend == "anthropic" then
 				auth_param = "x-api-key: " .. (params.api_key or "")
 				data.system = prompt
-				url = params.url or Anthropic_defaults.url
+				url = params.url or Defaults.antrhopic_url
 			elseif backend == "openai" then
 				auth_param = "Authorization: Bearer " .. (params.api_key or "")
 				table.insert(messages, 1, { role = "system", content = prompt })
-				url = params.url or OpenAI_defaults.url
+				url = params.url or Defaults.openai_url
 			else
 				error("Unknown backend: " .. backend, 2)
 			end
@@ -71,10 +72,13 @@ local function make_backend(backend, params)
 				.. " -H "
 				.. vim.fn.shellescape("Content-Type: application/json")
 
+			-- Extra header required by the Anthropic API.
 			if backend == "anthropic" then
 				cmd = cmd
 					.. " -H "
-					.. vim.fn.shellescape("anthropic-version: " .. (params.anthropic_version or "2023-06-01"))
+					.. vim.fn.shellescape(
+						"anthropic-version: " .. (params.anthropic_version or Defaults.anthropic_version)
+					)
 			end
 
 			local response = vim.fn.system(cmd)

@@ -5,8 +5,8 @@ local config = {
 	prompts = {},
 	default_prompt = "",
 }
-Current_backend = ""
-Current_prompt = ""
+local Current_backend = ""
+local Current_prompt = ""
 local API_keys = {}
 
 -- Util functions.

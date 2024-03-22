@@ -4,6 +4,7 @@ local Config = {
   default_backend = '',
   prompts = {},
   default_prompt = '',
+  section_mark = '-------',
 }
 local Defaults = {
   openai_url = 'https://api.openai.com/v1/chat/completions',
@@ -134,7 +135,8 @@ end
 function M.M0chat()
   local conversation = vim.api.nvim_buf_get_lines(0, 0, -1, false)
   local messages = {}
-  local section_mark = '====='
+  local section_mark = Config.section_mark
+  local section_mark_len = string.len(section_mark)
 
   local i = 1
   local role = {
@@ -144,7 +146,7 @@ function M.M0chat()
   local role_idx = 1
   while i <= #conversation do
     -- Switch between roles when meeting a section mark in the conversattion.
-    if conversation[i]:sub(1, 5) == section_mark then
+    if conversation[i]:sub(1, section_mark_len) == section_mark then
       i = i + 1
       if role_idx == 1 then
         role_idx = 2
@@ -155,7 +157,10 @@ function M.M0chat()
 
     local message = { role = role[role_idx], content = '' }
 
-    while i <= #conversation and conversation[i]:sub(1, 5) ~= section_mark do
+    while
+      i <= #conversation
+      and conversation[i]:sub(1, section_mark_len) ~= section_mark
+    do
       message.content = message.content .. conversation[i] .. '\n'
       i = i + 1
     end

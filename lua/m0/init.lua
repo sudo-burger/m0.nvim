@@ -12,7 +12,7 @@ local Defaults = {
   anthropic_version = '2023-06-01',
   max_tokens = 512,
   temperature = 1,
-  stream = true,
+  stream = false,
 }
 local Current_backend = ''
 local Current_prompt = ''
@@ -122,8 +122,10 @@ local function make_backend(backend, opts)
         body = vim.fn.json_encode(body),
       }
 
-      -- Different callbacks needed, depending on whether streaming is enabled.
+      -- Different callbacks needed, depending on whether streaming is enabled or not.
       if Defaults.stream == true then
+        local line = ''
+        -- The streaming callback appends the reply deltas to the current buffer.
         curl_opts.stream = vim.schedule_wrap(function(_, out, _)
           local d = get_delta_text(out)
           if d then
@@ -131,18 +133,24 @@ local function make_backend(backend, opts)
           end
         end)
       else
+        -- When not streaming, we append the LLM's reply to the current buffer at one go.
         curl_opts.callback = vim.schedule_wrap(function(out)
           -- Build and print the reply in the current buffer.
           -- The assistant reply is enclosed in "section marks".
-          vim.api.nvim_buf_set_lines(0, -1, -1, false, { Config.section_mark })
           vim.api.nvim_buf_set_lines(
             0,
             -1,
             -1,
             false,
-            vim.fn.split(get_response_text(vim.fn.json_decode(out.body)), '\n')
+            vim.fn.split(
+              Config.section_mark
+                .. '\n'
+                .. get_response_text(vim.fn.json_decode(out.body))
+                .. '\n'
+                .. Config.section_mark,
+              '\n'
+            )
           )
-          vim.api.nvim_buf_set_lines(0, -1, -1, false, { Config.section_mark })
         end)
       end
 
@@ -177,17 +185,7 @@ function M.M0prompt(prompt)
   print('Prompt: ' .. Current_prompt)
 end
 
-local function show_reply(reply)
-  local section_mark = Config.section_mark
-
-  -- Build and print the reply in the current buffer.
-  -- The assistant reply is enclosed in "section marks".
-  vim.api.nvim_buf_set_lines(0, -1, -1, false, { section_mark })
-  vim.api.nvim_buf_set_lines(0, -1, -1, false, vim.fn.split(reply, '\n'))
-  vim.api.nvim_buf_set_lines(0, -1, -1, false, { section_mark })
-end
-
-function get_messages_from_buffer()
+local function get_messages_from_buffer()
   local messages = {}
   local section_mark = Config.section_mark
   local section_mark_len = string.len(section_mark)

@@ -33,56 +33,63 @@ end
 -- Returns:
 -- A table including the backend-specific params and the function: run().
 --
-local function make_backend(backend, params)
+local function make_backend(backend, opts)
   -- Sanity checks.
   if backend ~= 'anthropic' and backend ~= 'openai' then
     error('Invalid backend: ' .. backend)
   end
-  if params == nil then
+  if opts == nil then
     error 'Missing configuration. Bailing out.'
   end
-  if params.model == nil then
+  if opts.model == nil then
     error 'Missing model. Bailing out.'
   end
-  local prompt = Config.prompts[Current_prompt]
-  local url = params.url or Defaults.openai_url
-  local authorization = 'Bearer ' .. (params.api_key or '')
-  local content_type = 'application/json'
-  local temperature = params.temperature or 1
-  local max_tokens = params.max_tokens or 128
-  local model = params.model
 
+  local url = nil
+  if backend == 'anthropic' then
+    url = opts.url or Defaults.antrhopic_url
+  elseif backend == 'openai' then
+    url = opts.url or Defaults.openai_url
+  end
+
+  local prompt = Config.prompts[Current_prompt]
+
+  -- Buld request headers.
+  --
   local headers = {
-    authorization = authorization,
-    content_type = content_type,
+    content_type = 'application/json',
   }
   -- Authorization, prompt, and message structure differ slightly
   -- between the Anthropic and OpenAI APIs.
-  -- if backend == 'anthropic' then
-  --   auth_param = 'x-api-key: ' .. (params.api_key or '')
-  --   api_payload.system = prompt
-  --   url = params.url or Defaults.antrhopic_url
-  -- elseif backend == 'openai' then
-  --   auth_param = 'Authorization: Bearer ' .. (params.api_key or '')
-  --   url = params.url or Defaults.openai_url
+  if backend == 'anthropic' then
+    headers.x_api_key = opts.api_key
+    headers.anthropic_version = Defaults.anthropic_version
+  elseif backend == 'openai' then
+    headers.authorization = 'Bearer ' .. opts.api_key
+  end
 
+  -- Buld request payload.
+  --
   local body = {
-    model = model,
-    temperature = temperature,
-    max_tokens = max_tokens,
+    model = opts.model,
+    temperature = opts.temperature or 1,
+    max_tokens = opts.max_tokens or 128,
     stream = false,
   }
-  -- The OpenAI completions API requires the prompt to be the first message
-  -- (with role 'system').
-  -- The Anthropic messages API requires the prompt to be a separate payload
-  -- variable, named 'system'.
 
-  -- else
-  --   error('Unknown backend: ' .. backend, 2)
-  -- end
+  if backend == 'anthropic' then
+    body.system = prompt
+  end
+
   return {
     run = function(messages, callback)
       local curl = require 'plenary.curl'
+
+      if backend == 'openai' then
+        -- The OpenAI completions API requires the prompt to be the first message
+        -- (with role 'system').
+        table.insert(messages, 1, { role = 'system', content = prompt })
+      end
       body.messages = messages
       local response = curl.post(url, {
         headers = headers,
@@ -91,43 +98,6 @@ local function make_backend(backend, params)
       callback(response.body)
     end,
   }
-  -- table.insert(messages, 1, { role = 'system', content = prompt })
-  -- api_payload.messages = messages
-  --   table.insert(curl_args, '-d')
-  --   table.insert(
-  --     curl_args,
-  --     vim.fn.shellescape(vim.fn.json_encode(api_payload))
-  --   )
-  --   local response = ''
-  --
-  --   local curl = require 'plenary.curl'
-  --   curl.post(url, {
-  --     headers = headers,
-  --   })
-  --
-  --     command = 'curl',
-  --     args = curl_args,
-  --     cwd = vim.fn.getcwd(),
-  --     on_stderr = function(_, return_val)
-  --       error('curl fails: ' .. return_val)
-  --     end,
-  --     on_exit = function(j, _)
-  --       local reply = ''
-  --       local json_response = vim.fn.json_decode(j:result())
-  --       if json_response.error then
-  --         error(json_response.error.message)
-  --       elseif backend == 'anthropic' then
-  --         reply = (json_response.content[1].text or '')
-  --       elseif backend == 'openai' then
-  --         reply = (json_response.choices[1].message.content or '')
-  --       end
-  --       callback(reply)
-  --     end,
-  --   }
-  --
-  --   job:start()
-  -- end,
-  -- }
 end
 
 -- Exported functions.

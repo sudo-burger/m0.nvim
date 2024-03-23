@@ -17,6 +17,7 @@ local Current_prompt = ''
 local API_keys = {}
 
 -- Util functions.
+-- Gets a key fron pass.
 function M.get_api_key(name)
   if API_keys[name] ~= nil then
     API_keys[name] = vim.fn.system('echo -n $(pass ' .. name .. ')')
@@ -27,13 +28,19 @@ end
 -- Generic backend.
 -- Args:
 --    backend: "anthropic" | "openai"
---    params: configuration table.
+--    params: backend-specific configuration table.
+--
+-- Returns:
+-- A table including the backend-specific params and the function: run().
 --
 local function make_backend(backend, params)
   if backend == nil or params == nil then
-    error 'No configuration. Bailing out.'
+    error 'Missing configuration. Bailing out.'
   end
-  -- Build the payload (or "data" in curl parlance).
+  if params.model == nil then
+    error 'Missing model. Bailing out.'
+  end
+  -- Build the API payload (or "data" in curl parlance).
   -- Mandatory:
   -- - max_tokens
   -- - messages
@@ -41,87 +48,101 @@ local function make_backend(backend, params)
   -- Optional:
   -- - temperature
   -- - prompt (note that Anthropic and OpenAI place this differently in the API calls).
-  local data = {}
-  data.max_tokens = (params.max_tokens or Defaults.max_tokens)
-  data.model = (params.model or '')
-  if params.temperature then
-    data.temperature = params.temperature
-  end
-
-  local prompt = (Config.prompts[Current_prompt] or '')
-  local auth_param = ''
-  local url = ''
+  -- local headers = {
+  --   Authorization = 'Bearer ' .. (params.api_key or ''),
+  --   Content_Type = "application/json",
+  -- }
+  -- local api_payload = {
+  --   model = nil,
+  --   temperature = nil,
+  --   max_tokens = nil
+  -- }
+  --
+  -- api_payload.model = (params.model or '')
+  -- api_payload.max_tokens = (tonumber(params.max_tokens) or Defaults.max_tokens)
+  -- if api_payload.max_tokens == nil then
+  --   error('Invalid max_tokens: ' .. params.max_tokens)
+  -- end
+  -- api_payload.temperature = (tonumber(params.max_tokens) or Defaults.max_tokens)
+  -- if api_payload.temperature == nil then
+  --   error('Invalid temperature: ' .. params.temperature)
+  -- end
+  --
+  -- The OpenAI completions API requires the prompt to be the first message
+  -- (with role 'system').
+  -- The Anthropic messages API requires the prompt to be a separate payload
+  -- variable, named 'system'.
+  -- prompt = (Config.prompts[Current_prompt] or '')
+  local url = params.url or Defaults.openai_url
 
   -- Authorization, prompt, and message structure differ slightly
   -- between the Anthropic and OpenAI APIs.
-  if backend == 'anthropic' then
-    auth_param = 'x-api-key: ' .. (params.api_key or '')
-    data.system = prompt
-    url = params.url or Defaults.antrhopic_url
-  elseif backend == 'openai' then
-    auth_param = 'Authorization: Bearer ' .. (params.api_key or '')
-    url = params.url or Defaults.openai_url
-  else
-    error('Unknown backend: ' .. backend, 2)
-  end
-
-  local curl_args = {
-    url,
-    '-s',
-    '-d',
-    vim.fn.json_encode(data),
-    '-H',
-    auth_param,
-    '-H',
-    'Content-Type: application/json',
-  }
-  -- Extra header required by the Anthropic API.
-  if backend == 'anthropic' then
-    table.insert(curl_args, '-H')
-    table.insert(
-      curl_args,
-      'anthropic-version: '
-        .. (params.anthropic_version or Defaults.anthropic_version)
-    )
-  end
+  -- if backend == 'anthropic' then
+  --   auth_param = 'x-api-key: ' .. (params.api_key or '')
+  --   api_payload.system = prompt
+  --   url = params.url or Defaults.antrhopic_url
+  -- elseif backend == 'openai' then
+  --   auth_param = 'Authorization: Bearer ' .. (params.api_key or '')
+  --   url = params.url or Defaults.openai_url
+  -- else
+  --   error('Unknown backend: ' .. backend, 2)
+  -- end
   return {
     run = function(messages, callback)
-      data.messages = messages
-      if backend == 'openai' then
-        table.insert(messages, 1, { role = 'system', content = prompt })
-      end
-      local job = require 'plenary.job'
-      job
-        :new({
-          command = 'curl',
-          args = curl_args,
-          cwd = '/usr/bin',
-          on_stderr = function(j, return_val)
-            callback {
-              error = {
-                message = 'curl command failed with code ' .. return_val,
-              },
-            }
-          end,
-          on_exit = function(j, return_val)
-            local response = j:result()
-            local json_response = vim.fn.json_decode(response)
-            local ret = {
-              error = json_response.error,
-            }
-            if ret.error then
-              callback(ret)
-            elseif backend == 'anthropic' then
-              ret.reply = (json_response.content[1].text or '')
-            elseif backend == 'openai' then
-              ret.reply = (json_response.choices[1].message.content or '')
-            end
-            callback(ret)
-          end,
-        })
-        :sync()
+      local curl = require 'plenary.curl'
+      local response = curl.post(url, {
+        headers = {
+          Authorization = 'Bearer ' .. (params.api_key or ''),
+          Content_Type = 'application/json',
+        },
+        body = vim.fn.json_encode {
+          model = params.model,
+          temperature = params.temperature or 1,
+          max_tokens = params.max_tokens or 128,
+          messages = messages,
+          stream = false,
+        },
+      })
+      callback(response.body)
     end,
   }
+  -- table.insert(messages, 1, { role = 'system', content = prompt })
+  -- api_payload.messages = messages
+  --   table.insert(curl_args, '-d')
+  --   table.insert(
+  --     curl_args,
+  --     vim.fn.shellescape(vim.fn.json_encode(api_payload))
+  --   )
+  --   local response = ''
+  --
+  --   local curl = require 'plenary.curl'
+  --   curl.post(url, {
+  --     headers = headers,
+  --   })
+  --
+  --     command = 'curl',
+  --     args = curl_args,
+  --     cwd = vim.fn.getcwd(),
+  --     on_stderr = function(_, return_val)
+  --       error('curl fails: ' .. return_val)
+  --     end,
+  --     on_exit = function(j, _)
+  --       local reply = ''
+  --       local json_response = vim.fn.json_decode(j:result())
+  --       if json_response.error then
+  --         error(json_response.error.message)
+  --       elseif backend == 'anthropic' then
+  --         reply = (json_response.content[1].text or '')
+  --       elseif backend == 'openai' then
+  --         reply = (json_response.choices[1].message.content or '')
+  --       end
+  --       callback(reply)
+  --     end,
+  --   }
+  --
+  --   job:start()
+  -- end,
+  -- }
 end
 
 -- Exported functions.
@@ -153,26 +174,14 @@ end
 local function show_reply(reply)
   local section_mark = Config.section_mark
 
-  if reply.error then
-    error(reply.error.message)
-  elseif reply.reply then
-    -- Build and print the reply in the current buffer.
-    -- The assistant reply is enclosed in "section marks".
-    vim.api.nvim_buf_set_lines(0, -1, -1, false, { section_mark })
-    vim.api.nvim_buf_set_lines(
-      0,
-      -1,
-      -1,
-      false,
-      vim.fn.split(reply.reply, '\n')
-    )
-    vim.api.nvim_buf_set_lines(0, -1, -1, false, { section_mark })
-  else
-    error 'Unable to get response.'
-  end
+  -- Build and print the reply in the current buffer.
+  -- The assistant reply is enclosed in "section marks".
+  vim.api.nvim_buf_set_lines(0, -1, -1, false, { section_mark })
+  vim.api.nvim_buf_set_lines(0, -1, -1, false, vim.fn.split(reply, '\n'))
+  vim.api.nvim_buf_set_lines(0, -1, -1, false, { section_mark })
 end
 
-function M.M0chat()
+function get_messages_from_buffer()
   local messages = {}
   local section_mark = Config.section_mark
   local section_mark_len = string.len(section_mark)
@@ -193,7 +202,9 @@ function M.M0chat()
   while i <= #conversation do
     -- Switch between roles when meeting a section mark in the conversation.
     if conversation[i]:sub(1, section_mark_len) == section_mark then
+      -- Next row.
       i = i + 1
+      -- Switch role.
       if role_idx == 1 then
         role_idx = 2
       else
@@ -213,13 +224,17 @@ function M.M0chat()
 
     table.insert(messages, message)
   end
+  return messages
+end
 
-  local chat = make_backend(
+function M.M0chat()
+  local messages = get_messages_from_buffer()
+  local backend = make_backend(
     Config.backends[Current_backend].type,
     Config.backends[Current_backend]
   )
 
-  chat.run(messages, show_reply)
+  backend.run(messages, show_reply)
 end
 
 function M.setup(user_config)

@@ -11,6 +11,8 @@ local Defaults = {
   antrhopic_url = 'https://api.anthropic.com/v1/messages',
   anthropic_version = '2023-06-01',
   max_tokens = 512,
+  temperature = 1,
+  stream = true,
 }
 local Current_backend = ''
 local Current_prompt = ''
@@ -72,9 +74,8 @@ local function make_backend(backend, opts)
   --
   local body = {
     model = opts.model,
-    temperature = opts.temperature or 1,
-    max_tokens = opts.max_tokens or 128,
-    stream = false,
+    temperature = opts.temperature or Defaults.temperature,
+    max_tokens = opts.max_tokens or Defaults.max_tokens,
   }
 
   if backend == 'anthropic' then
@@ -91,11 +92,25 @@ local function make_backend(backend, opts)
         table.insert(messages, 1, { role = 'system', content = prompt })
       end
       body.messages = messages
-      local response = curl.post(url, {
+
+      body.stream = Defaults.stream
+
+      local opts = {
         headers = headers,
         body = vim.fn.json_encode(body),
-      })
-      callback(response.body)
+      }
+
+      if Defaults.stream == true then
+        opts.stream = vim.schedule_wrap(function(_, out, _)
+          return callback(out)
+        end)
+      else
+        opts.callback = vim.schedule_wrap(function(out)
+          return callback(out.body)
+        end)
+      end
+
+      curl.post(url, opts)
     end,
   }
 end

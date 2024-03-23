@@ -34,47 +34,28 @@ end
 -- A table including the backend-specific params and the function: run().
 --
 local function make_backend(backend, params)
-  if backend == nil or params == nil then
+  -- Sanity checks.
+  if backend ~= 'anthropic' and backend ~= 'openai' then
+    error('Invalid backend: ' .. backend)
+  end
+  if params == nil then
     error 'Missing configuration. Bailing out.'
   end
   if params.model == nil then
     error 'Missing model. Bailing out.'
   end
-  -- Build the API payload (or "data" in curl parlance).
-  -- Mandatory:
-  -- - max_tokens
-  -- - messages
-  -- - model (the user configuration is expected to set this; there is no default).
-  -- Optional:
-  -- - temperature
-  -- - prompt (note that Anthropic and OpenAI place this differently in the API calls).
-  -- local headers = {
-  --   Authorization = 'Bearer ' .. (params.api_key or ''),
-  --   Content_Type = "application/json",
-  -- }
-  -- local api_payload = {
-  --   model = nil,
-  --   temperature = nil,
-  --   max_tokens = nil
-  -- }
-  --
-  -- api_payload.model = (params.model or '')
-  -- api_payload.max_tokens = (tonumber(params.max_tokens) or Defaults.max_tokens)
-  -- if api_payload.max_tokens == nil then
-  --   error('Invalid max_tokens: ' .. params.max_tokens)
-  -- end
-  -- api_payload.temperature = (tonumber(params.max_tokens) or Defaults.max_tokens)
-  -- if api_payload.temperature == nil then
-  --   error('Invalid temperature: ' .. params.temperature)
-  -- end
-  --
-  -- The OpenAI completions API requires the prompt to be the first message
-  -- (with role 'system').
-  -- The Anthropic messages API requires the prompt to be a separate payload
-  -- variable, named 'system'.
-  -- prompt = (Config.prompts[Current_prompt] or '')
+  local prompt = Config.prompts[Current_prompt]
   local url = params.url or Defaults.openai_url
+  local authorization = 'Bearer ' .. (params.api_key or '')
+  local content_type = 'application/json'
+  local temperature = params.temperature or 1
+  local max_tokens = params.max_tokens or 128
+  local model = params.model
 
+  local headers = {
+    authorization = authorization,
+    content_type = content_type,
+  }
   -- Authorization, prompt, and message structure differ slightly
   -- between the Anthropic and OpenAI APIs.
   -- if backend == 'anthropic' then
@@ -84,24 +65,28 @@ local function make_backend(backend, params)
   -- elseif backend == 'openai' then
   --   auth_param = 'Authorization: Bearer ' .. (params.api_key or '')
   --   url = params.url or Defaults.openai_url
+
+  local body = {
+    model = model,
+    temperature = temperature,
+    max_tokens = max_tokens,
+    stream = false,
+  }
+  -- The OpenAI completions API requires the prompt to be the first message
+  -- (with role 'system').
+  -- The Anthropic messages API requires the prompt to be a separate payload
+  -- variable, named 'system'.
+
   -- else
   --   error('Unknown backend: ' .. backend, 2)
   -- end
   return {
     run = function(messages, callback)
       local curl = require 'plenary.curl'
+      body.messages = messages
       local response = curl.post(url, {
-        headers = {
-          Authorization = 'Bearer ' .. (params.api_key or ''),
-          Content_Type = 'application/json',
-        },
-        body = vim.fn.json_encode {
-          model = params.model,
-          temperature = params.temperature or 1,
-          max_tokens = params.max_tokens or 128,
-          messages = messages,
-          stream = false,
-        },
+        headers = headers,
+        body = vim.fn.json_encode(body),
       })
       callback(response.body)
     end,

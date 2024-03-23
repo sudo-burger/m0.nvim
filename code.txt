@@ -1,0 +1,119 @@
+-*-*-*-*-*-*-*-*-
+To make the `chat.run` call asynchronous in the Neovim plugin, you can use Neovim's built-in `vim.loop.spawn` function to execute the `curl` command asynchronously. Here's how you can modify the code to achieve that:
+
+1. Update the `make_backend` function to return a `run` function that takes a callback:
+
+```lua
+local function make_backend(backend, params)
+  -- ...
+  return {
+    run = function(messages, callback)
+      -- ...
+      local cmd = -- ...
+
+      vim.loop.spawn(
+        'curl',
+        {
+          args = vim.split(cmd, ' ', true),
+          stdio = { nil, vim.loop.new_pipe(false), nil },
+        },
+        function(code, signal)
+          if code ~= 0 then
+            callback({ error = { message = 'curl command failed with code ' .. code } })
+            return
+          end
+
+          local response = table.concat(output, '')
+          local json_response = vim.fn.json_decode(response)
+
+          local ret = {
+            error = json_response.error,
+          }
+          if ret.error then
+            callback(ret)
+          elseif backend == 'anthropic' then
+            ret.reply = (json_response.content[1].text or '')
+          elseif backend == 'openai' then
+            ret.reply = (json_response.choices[1].message.content or '')
+          end
+          callback(ret)
+        end
+      )
+    end,
+  }
+end
+```
+
+2. Update the `M.M0chat` function to handle the asynchronous callback:
+
+```lua
+function M.M0chat()
+  -- ...
+  local chat = make_backend(
+    Config.backends[Current_backend].type,
+    Config.backends[Current_backend]
+  )
+
+  chat.run(messages, function(ret)
+    show_reply(ret)
+  end)
+end
+```
+
+With these changes, the `chat.run` function now takes a callback function as an argument. The `curl` command is executed asynchronously using `vim.loop.spawn
+-*-*-*-*-*-*-*-*-
+Tell ne nore about the 'output' variable in your code example.
+-*-*-*-*-*-*-*-*-
+Apologies for the confusion. In the previous code example, I made a mistake by using the `output` variable without defining it properly. Let me provide an updated and corrected version of the code:
+
+```lua
+local function make_backend(backend, params)
+  -- ...
+  return {
+    run = function(messages, callback)
+      -- ...
+      local cmd = -- ...
+
+      vim.loop.spawn(
+        'curl',
+        {
+          args = vim.split(cmd, ' ', true),
+          stdio = { nil, vim.loop.new_pipe(false), nil },
+        },
+        function(code, signal)
+          if code ~= 0 then
+            callback({ error = { message = 'curl command failed with code ' .. code } })
+            return
+          end
+
+          local response = vim.api.nvim_get_vvar('shell_error')
+          local json_response = vim.fn.json_decode(response)
+
+          local ret = {
+            error = json_response.error,
+          }
+          if ret.error then
+            callback(ret)
+          elseif backend == 'anthropic' then
+            ret.reply = (json_response.content[1].text or '')
+          elseif backend == 'openai' then
+            ret.reply = (json_response.choices[1].message.content or '')
+          end
+          callback(ret)
+        end
+      )
+    end,
+  }
+end
+```
+
+In the corrected version, I removed the usage of the `output` variable since it was not defined. Instead, we can use `vim.api.nvim_get_vvar('shell_error')` to retrieve the output of the `curl` command.
+
+Here's how it works:
+
+- `vim.loop.spawn` executes the `curl` command asynchronously.
+- The `stdio` option is set to `{ nil, vim.loop.new_pipe(false), nil }`, which means that the standard output of the `curl` command is redirected to a new pipe.
+- After the `curl` command finishes executing, the callback function is called.
+- Inside the callback function, we use `vim.api.nvim_get_vvar
+-*-*-*-*-*-*-*-*-
+What is 'shell_error'?

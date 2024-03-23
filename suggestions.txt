@@ -1,0 +1,41 @@
+1. Error handling and user
+feedback:
+   - Improve error handling by providing more informative error messages to the
+     user.
+   - Display a status message or indicator when the plugin is waiting for a
+     response from the AI backend.
+   - Implement a timeout mechanism to handle cases where the API request takes
+     too long or fails silently.
+
+2. Asynchronous API calls:
+   - Convert the `run` function in the backend object to use asynchronous API
+     calls instead of blocking the editor while waiting for the response.
+   - Use Neovim's built-in `jobstart` or `libuv` library to make asynchronous
+     HTTP requests.
+   - Update the `M0chat` function to handle the asynchronous nature of the API
+     calls and display the response when it arrives.
+
+3. Conversation history and persistence:
+   - Implement a mechanism to store conversation history across sessions.
+   - Introduce a new command or function to start a new conversation or
+     continue an existing one.
+   - Store conversation history in a separate file or database, allowing users
+     to review and resume previous conversations.
+   - Provide commands to browse, search, and manage conversation history.
+
+Additionally, here are a few minor improvements:
+
+- Add support for more AI backends by extending the `make_backend` function and
+  providing corresponding configuration options.
+- Implement command completion for `M0prompt` and `M0backend` commands based on
+  the available prompts and backends in the configuration.
+- Allow users to customize the section mark used to separate user and assistant
+  messages in the conversation.
+- Provide options to configure the display format of the conversation in the
+  buffer (e.g., indentation, text wrapping).
+- Add documentation and help files for the plugin, explaining its usage,
+  configuration options, and available commands.
+
+These improvements focus on enhancing the user experience, handling errors
+gracefully, improving performance through asynchronous calls, and providing
+conversation persistence and management features. =====

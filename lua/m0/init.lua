@@ -33,75 +33,93 @@ local function make_backend(backend, params)
   if backend == nil or params == nil then
     error 'No configuration. Bailing out.'
   end
+  -- Build the payload (or "data" in curl parlance).
+  -- Mandatory:
+  -- - max_tokens
+  -- - messages
+  -- - model (the user configuration is expected to set this; there is no default).
+  -- Optional:
+  -- - temperature
+  -- - prompt (note that Anthropic and OpenAI place this differently in the API calls).
+  local data = {}
+  data.max_tokens = (params.max_tokens or Defaults.max_tokens)
+  data.model = (params.model or '')
+  if params.temperature then
+    data.temperature = params.temperature
+  end
+
+  local prompt = (Config.prompts[Current_prompt] or '')
+  local auth_param = ''
+  local url = ''
+
+  -- Authorization, prompt, and message structure differ slightly
+  -- between the Anthropic and OpenAI APIs.
+  if backend == 'anthropic' then
+    auth_param = 'x-api-key: ' .. (params.api_key or '')
+    data.system = prompt
+    url = params.url or Defaults.antrhopic_url
+  elseif backend == 'openai' then
+    auth_param = 'Authorization: Bearer ' .. (params.api_key or '')
+    url = params.url or Defaults.openai_url
+  else
+    error('Unknown backend: ' .. backend, 2)
+  end
+
+  local curl_args = {
+    url,
+    '-s',
+    '-d',
+    vim.fn.json_encode(data),
+    '-H',
+    auth_param,
+    '-H',
+    'Content-Type: application/json',
+  }
+  -- Extra header required by the Anthropic API.
+  if backend == 'anthropic' then
+    table.insert(curl_args, '-H')
+    table.insert(
+      curl_args,
+      'anthropic-version: '
+        .. (params.anthropic_version or Defaults.anthropic_version)
+    )
+  end
   return {
-    run = function(messages)
-      -- Build the payload (or "data" in curl parlance).
-      -- Mandatory:
-      -- - max_tokens
-      -- - messages
-      -- - model (the user configuration is expected to set this; there is no default).
-      -- Optional:
-      -- - temperature
-      -- - prompt (note that Anthropic and OpenAI place this differently in the API calls).
-      local data = {}
-      data.max_tokens = (params.max_tokens or Defaults.max_tokens)
-      data.model = (params.model or '')
-      if params.temperature then
-        data.temperature = params.temperature
-      end
+    run = function(messages, callback)
       data.messages = messages
-
-      local prompt = (Config.prompts[Current_prompt] or '')
-      local auth_param = ''
-      local url = ''
-
-      -- Authorization, prompt, and message structure differ slightly
-      -- between the Anthropic and OpenAI APIs.
-      if backend == 'anthropic' then
-        auth_param = 'x-api-key: ' .. (params.api_key or '')
-        data.system = prompt
-        url = params.url or Defaults.antrhopic_url
-      elseif backend == 'openai' then
-        auth_param = 'Authorization: Bearer ' .. (params.api_key or '')
+      if backend == 'openai' then
         table.insert(messages, 1, { role = 'system', content = prompt })
-        url = params.url or Defaults.openai_url
-      else
-        error('Unknown backend: ' .. backend, 2)
       end
-
-      local cmd = 'curl -s '
-        .. vim.fn.shellescape(url)
-        .. ' -d '
-        .. vim.fn.shellescape(vim.fn.json_encode(data))
-        .. ' -H '
-        .. vim.fn.shellescape(auth_param)
-        .. ' -H '
-        .. vim.fn.shellescape 'Content-Type: application/json'
-
-      -- Extra header required by the Anthropic API.
-      if backend == 'anthropic' then
-        cmd = cmd
-          .. ' -H '
-          .. vim.fn.shellescape(
-            'anthropic-version: '
-              .. (params.anthropic_version or Defaults.anthropic_version)
-          )
-      end
-
-      local response = vim.fn.system(cmd)
-      local json_response = vim.fn.json_decode(response)
-
-      local ret = {
-        error = json_response.error,
-      }
-      if ret.error then
-        return ret
-      elseif backend == 'anthropic' then
-        ret.reply = (json_response.content[1].text or '')
-      elseif backend == 'openai' then
-        ret.reply = (json_response.choices[1].message.content or '')
-      end
-      return ret
+      local job = require 'plenary.job'
+      job
+        :new({
+          command = 'curl',
+          args = curl_args,
+          cwd = '/usr/bin',
+          on_stderr = function(j, return_val)
+            callback {
+              error = {
+                message = 'curl command failed with code ' .. return_val,
+              },
+            }
+          end,
+          on_exit = function(j, return_val)
+            local response = j:result()
+            local json_response = vim.fn.json_decode(response)
+            local ret = {
+              error = json_response.error,
+            }
+            if ret.error then
+              callback(ret)
+            elseif backend == 'anthropic' then
+              ret.reply = (json_response.content[1].text or '')
+            elseif backend == 'openai' then
+              ret.reply = (json_response.choices[1].message.content or '')
+            end
+            callback(ret)
+          end,
+        })
+        :sync()
     end,
   }
 end
@@ -132,12 +150,40 @@ function M.M0prompt(prompt)
   print('Prompt: ' .. Current_prompt)
 end
 
+local function show_reply(reply)
+  local section_mark = Config.section_mark
+
+  if reply.error then
+    error(reply.error.message)
+  elseif reply.reply then
+    -- Build and print the reply in the current buffer.
+    -- The assistant reply is enclosed in "section marks".
+    vim.api.nvim_buf_set_lines(0, -1, -1, false, { section_mark })
+    vim.api.nvim_buf_set_lines(
+      0,
+      -1,
+      -1,
+      false,
+      vim.fn.split(reply.reply, '\n')
+    )
+    vim.api.nvim_buf_set_lines(0, -1, -1, false, { section_mark })
+  else
+    error 'Unable to get response.'
+  end
+end
+
 function M.M0chat()
-  local conversation = vim.api.nvim_buf_get_lines(0, 0, -1, false)
   local messages = {}
   local section_mark = Config.section_mark
   local section_mark_len = string.len(section_mark)
+  -- Read the conversation from the current buffer.
+  local conversation = vim.api.nvim_buf_get_lines(0, 0, -1, false)
 
+  -- Transform the conversation into a series of 'messages',
+  -- as required by the APIs.
+  -- In these messages, the 'user' and 'assistant' take turns.
+  -- "Section marks" also used to distinguish between user and
+  -- assistant input when building the API calls.
   local i = 1
   local role = {
     'user',
@@ -145,7 +191,7 @@ function M.M0chat()
   }
   local role_idx = 1
   while i <= #conversation do
-    -- Switch between roles when meeting a section mark in the conversattion.
+    -- Switch between roles when meeting a section mark in the conversation.
     if conversation[i]:sub(1, section_mark_len) == section_mark then
       i = i + 1
       if role_idx == 1 then
@@ -155,8 +201,8 @@ function M.M0chat()
       end
     end
 
+    -- Build a message.
     local message = { role = role[role_idx], content = '' }
-
     while
       i <= #conversation
       and conversation[i]:sub(1, section_mark_len) ~= section_mark
@@ -172,26 +218,8 @@ function M.M0chat()
     Config.backends[Current_backend].type,
     Config.backends[Current_backend]
   )
-  local result = chat.run(messages)
-  if result.error then
-    vim.api.nvim_err_writeln('Error: ' .. result.error.message)
-  elseif result.reply then
-    -- Build and print the reply in the current buffer.
-    -- The reply is enclosed in "section_marks".
-    -- The section marks are also used to distinguish between
-    -- user and assistant input when building the API calls.
-    vim.api.nvim_buf_set_lines(0, -1, -1, false, { section_mark })
-    vim.api.nvim_buf_set_lines(
-      0,
-      -1,
-      -1,
-      false,
-      vim.fn.split(result.reply, '\n')
-    )
-    vim.api.nvim_buf_set_lines(0, -1, -1, false, { section_mark })
-  else
-    vim.api.nvim_err_writeln 'Error: Unable to get response.'
-  end
+
+  chat.run(messages, show_reply)
 end
 
 function M.setup(user_config)

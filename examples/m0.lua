@@ -1,5 +1,8 @@
 return {
   'sudo-burger/m0.nvim',
+  dependencies = {
+    'nvim-lua/plenary.nvim',
+  },
   cmd = { 'M0chat' },
   init = function()
     vim.keymap.set('n', '<leader>x', require('m0').M0chat, { desc = 'M0chat' })

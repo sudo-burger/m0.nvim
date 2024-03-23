@@ -70,7 +70,7 @@ local function make_backend(backend, opts)
     headers.authorization = 'Bearer ' .. opts.api_key
   end
 
-  -- Buld request payload.
+  -- Build request payload.
   --
   local body = {
     model = opts.model,
@@ -82,35 +82,71 @@ local function make_backend(backend, opts)
     body.system = prompt
   end
 
+  -- The response is modeled differently, depending on the API.
+  local function get_response_text(data)
+    if backend == 'anthropic' then
+      return data.content[1].text
+    elseif backend == 'openai' then
+      return data.choices[1].message.content
+    end
+  end
+  -- Similarly, the streaminng deltas are modeled differently, depending on the API.
+  local function get_delta_text(data)
+    if string.sub(data, 1, 6) ~= 'data: ' then
+      -- Not a data package. Skip.
+      return
+    end
+    local j = vim.fn.json_decode(string.sub(data, 7))
+    if backend == 'anthropic' and j.type == 'content_block_delta' then
+      return j.delta.text
+    elseif backend == 'openai' and data.choices[1].delta.content then
+      return data.choices[1].delta.content
+    end
+  end
+
   return {
-    run = function(messages, callback)
+    run = function(messages)
       local curl = require 'plenary.curl'
 
       if backend == 'openai' then
         -- The OpenAI completions API requires the prompt to be the first message
-        -- (with role 'system').
+        -- (with role 'system'). Patch the messages here.
         table.insert(messages, 1, { role = 'system', content = prompt })
       end
       body.messages = messages
 
       body.stream = Defaults.stream
 
-      local opts = {
+      local curl_opts = {
         headers = headers,
         body = vim.fn.json_encode(body),
       }
 
+      -- Different callbacks needed, depending on whether streaming is enabled.
       if Defaults.stream == true then
-        opts.stream = vim.schedule_wrap(function(_, out, _)
-          return callback(out)
+        curl_opts.stream = vim.schedule_wrap(function(_, out, _)
+          local d = get_delta_text(out)
+          if d then
+            vim.api.nvim_put({ d }, 'c', false, true)
+          end
         end)
       else
-        opts.callback = vim.schedule_wrap(function(out)
-          return callback(out.body)
+        curl_opts.callback = vim.schedule_wrap(function(out)
+          -- Build and print the reply in the current buffer.
+          -- The assistant reply is enclosed in "section marks".
+          vim.api.nvim_buf_set_lines(0, -1, -1, false, { Config.section_mark })
+          vim.api.nvim_buf_set_lines(
+            0,
+            -1,
+            -1,
+            false,
+            vim.fn.split(get_response_text(vim.fn.json_decode(out.body)), '\n')
+          )
+          vim.api.nvim_buf_set_lines(0, -1, -1, false, { Config.section_mark })
         end)
       end
 
-      curl.post(url, opts)
+      curl.post(url, curl_opts)
     end,
   }
 end
@@ -204,7 +240,7 @@ function M.M0chat()
     Config.backends[Current_backend]
   )
 
-  backend.run(messages, show_reply)
+  backend.run(messages)
 end
 
 function M.setup(user_config)

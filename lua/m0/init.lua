@@ -106,6 +106,17 @@ local function make_backend(backend, params)
   }
 end
 
+local function show_reply(reply)
+  -- Build and print the reply in the current buffer.
+  -- The reply is enclosed in "section_marks".
+  -- The section marks are also used to distinguish between
+  -- user and assistant input when building the API calls.
+  local section_mark = Config.section_mark
+  vim.api.nvim_buf_set_lines(0, -1, -1, false, { section_mark })
+  vim.api.nvim_buf_set_lines(0, -1, -1, false, vim.fn.split(reply, '\n'))
+  vim.api.nvim_buf_set_lines(0, -1, -1, false, { section_mark })
+end
+
 -- Exported functions.
 --
 
@@ -174,23 +185,11 @@ function M.M0chat()
   )
   local result = chat.run(messages)
   if result.error then
-    vim.api.nvim_err_writeln('Error: ' .. result.error.message)
+    error(result.error.message)
   elseif result.reply then
-    -- Build and print the reply in the current buffer.
-    -- The reply is enclosed in "section_marks".
-    -- The section marks are also used to distinguish between
-    -- user and assistant input when building the API calls.
-    vim.api.nvim_buf_set_lines(0, -1, -1, false, { section_mark })
-    vim.api.nvim_buf_set_lines(
-      0,
-      -1,
-      -1,
-      false,
-      vim.fn.split(result.reply, '\n')
-    )
-    vim.api.nvim_buf_set_lines(0, -1, -1, false, { section_mark })
+    show_reply(result.reply)
   else
-    vim.api.nvim_err_writeln 'Error: Unable to get response.'
+    error 'Unable to get response.'
   end
 end
 

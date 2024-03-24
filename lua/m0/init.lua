@@ -10,9 +10,9 @@ local Defaults = {
   openai_url = 'https://api.openai.com/v1/chat/completions',
   antrhopic_url = 'https://api.anthropic.com/v1/messages',
   anthropic_version = '2023-06-01',
-  max_tokens = 512,
+  max_tokens = 128,
   temperature = 1,
-  stream = false,
+  stream = true,
 }
 local Current_backend = ''
 local Current_prompt = ''
@@ -25,6 +25,50 @@ function M.get_api_key(name)
     API_keys[name] = vim.fn.system('echo -n $(pass ' .. name .. ')')
   end
   return API_keys[name]
+end
+
+-- The response is modeled differently, depending on the API.
+local function get_response_text(backend, data)
+  if backend == 'anthropic' then
+    return data.content[1].text
+  elseif backend == 'openai' then
+    return data.choices[1].message.content
+  end
+end
+-- Similarly, the streaminng deltas are modeled differently, depending on the API.
+-- Args:
+--   backend: anthropic | openai
+--   body: the body of the response.
+-- Returns:
+--   event, delta
+--   where:
+--   event: delta | done | cruft'
+--   delta: the delta text.
+--
+local function get_delta_text(backend, body)
+  if
+    (backend == 'openai' and body == 'data: [DONE]')
+    or (backend == 'anthropic' and body == 'event: message_stop')
+  then
+    return 'done', nil
+  end
+
+  if string.find(body, '^data: ') == nil then
+    -- Not a data package. Skip.
+    return 'cruft', nil
+  end
+
+  -- We are in a 'data: ' package now.
+  -- Extract and return the text payload.
+  --
+  local j = vim.fn.json_decode(string.sub(body, 7))
+  if backend == 'anthropic' and j.type == 'content_block_delta' then
+    return 'delta', j.delta.text
+  elseif backend == 'openai' and j.object == 'chat.completion.chunk' then
+    return 'delta', j.choices[1].delta.content
+  else
+    return 'other', body
+  end
 end
 
 -- Generic backend.
@@ -40,11 +84,8 @@ local function make_backend(backend, opts)
   if backend ~= 'anthropic' and backend ~= 'openai' then
     error('Invalid backend: ' .. backend)
   end
-  if opts == nil then
-    error 'Missing configuration. Bailing out.'
-  end
-  if opts.model == nil then
-    error 'Missing model. Bailing out.'
+  if opts == nil or opts.model == nil then
+    error 'Incomplete configuration. Bailing out.'
   end
 
   local url = nil
@@ -82,28 +123,6 @@ local function make_backend(backend, opts)
     body.system = prompt
   end
 
-  -- The response is modeled differently, depending on the API.
-  local function get_response_text(data)
-    if backend == 'anthropic' then
-      return data.content[1].text
-    elseif backend == 'openai' then
-      return data.choices[1].message.content
-    end
-  end
-  -- Similarly, the streaminng deltas are modeled differently, depending on the API.
-  local function get_delta_text(data)
-    if string.sub(data, 1, 6) ~= 'data: ' then
-      -- Not a data package. Skip.
-      return
-    end
-    local j = vim.fn.json_decode(string.sub(data, 7))
-    if backend == 'anthropic' and j.type == 'content_block_delta' then
-      return j.delta.text
-    elseif backend == 'openai' and data.choices[1].delta.content then
-      return data.choices[1].delta.content
-    end
-  end
-
   return {
     run = function(messages)
       local curl = require 'plenary.curl'
@@ -122,14 +141,37 @@ local function make_backend(backend, opts)
         body = vim.fn.json_encode(body),
       }
 
+      local function print_section_mark()
+        vim.api.nvim_buf_set_lines(
+          0,
+          -1,
+          -1,
+          false,
+          { Config.section_mark, '' }
+        )
+      end
+
       -- Different callbacks needed, depending on whether streaming is enabled or not.
       if Defaults.stream == true then
-        local line = ''
         -- The streaming callback appends the reply deltas to the current buffer.
         curl_opts.stream = vim.schedule_wrap(function(_, out, _)
-          local d = get_delta_text(out)
-          if d then
-            vim.api.nvim_put({ d }, 'c', false, true)
+          local event, d = get_delta_text(backend, out)
+          if event == 'delta' and d then
+            vim.api.nvim_buf_set_lines(
+              0,
+              -2,
+              -1,
+              false,
+              -- { out, '' }
+              -- Add the delta to the current line.
+              vim.fn.split(
+                table.concat(vim.api.nvim_buf_get_lines(0, -2, -1, false)) .. d,
+                '\n',
+                true
+              )
+            )
+          elseif event == 'done' then
+            print_section_mark()
           end
         end)
       else
@@ -139,21 +181,21 @@ local function make_backend(backend, opts)
           -- The assistant reply is enclosed in "section marks".
           vim.api.nvim_buf_set_lines(
             0,
-            -1,
+            -2,
             -1,
             false,
             vim.fn.split(
-              Config.section_mark
-                .. '\n'
-                .. get_response_text(vim.fn.json_decode(out.body))
-                .. '\n'
-                .. Config.section_mark,
+              get_response_text(backend, vim.fn.json_decode(out.body)),
               '\n'
             )
           )
+          print_section_mark()
         end)
       end
 
+      -- Start the response section.
+      -- Note that we prepare the next empty line for the reply.
+      print_section_mark()
       curl.post(url, curl_opts)
     end,
   }

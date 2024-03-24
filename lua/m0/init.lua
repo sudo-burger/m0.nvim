@@ -62,9 +62,13 @@ local function get_delta_text(backend, body)
   -- Extract and return the text payload.
   --
   local j = vim.fn.json_decode(string.sub(body, 7))
+  ---@diagnostic disable-next-line: need-check-nil, undefined-field
   if backend == 'anthropic' and j.type == 'content_block_delta' then
+    ---@diagnostic disable-next-line: need-check-nil, undefined-field
     return 'delta', j.delta.text
+  ---@diagnostic disable-next-line: need-check-nil, undefined-field
   elseif backend == 'openai' and j.object == 'chat.completion.chunk' then
+    ---@diagnostic disable-next-line: need-check-nil, undefined-field
     return 'delta', j.choices[1].delta.content
   else
     return 'other', body

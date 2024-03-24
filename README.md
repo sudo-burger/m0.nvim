@@ -23,3 +23,9 @@ interpreted as assistant answers.
 Call M0backend to change backend.
 
 Call M0prompt to change prompt.
+
+## Similar Projects
+
+- [karthink/GPTel](https://github.com/karthink/gptel)
+- [CamdenClark/flyboy](https://github.com/CamdenClark/flyboy)
+- [gsuuon/model.nvim](https://github.com/gsuuon/model.nvim)

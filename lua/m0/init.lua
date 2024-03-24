@@ -134,6 +134,8 @@ local function make_backend(backend, opts)
 
   return {
     run = function(messages)
+      local buf_id = vim.api.nvim_get_current_buf()
+
       if backend == 'openai' then
         -- The OpenAI completions API requires the prompt to be the first message
         -- (with role 'system'). Patch the messages here.
@@ -154,7 +156,7 @@ local function make_backend(backend, opts)
 
       local function print_section_mark()
         vim.api.nvim_buf_set_lines(
-          0,
+          buf_id,
           -1,
           -1,
           false,
@@ -169,14 +171,15 @@ local function make_backend(backend, opts)
           local event, d = get_delta_text(backend, out)
           if event == 'delta' and d then
             vim.api.nvim_buf_set_lines(
-              0,
+              buf_id,
               -2,
               -1,
               false,
               -- { out, '' }
               -- Add the delta to the current line.
               vim.fn.split(
-                table.concat(vim.api.nvim_buf_get_lines(0, -2, -1, false)) .. d,
+                table.concat(vim.api.nvim_buf_get_lines(buf_id, -2, -1, false))
+                  .. d,
                 '\n',
                 true
               )
@@ -192,7 +195,7 @@ local function make_backend(backend, opts)
           -- Build and print the reply in the current buffer.
           -- The assistant reply is enclosed in "section marks".
           vim.api.nvim_buf_set_lines(
-            0,
+            buf_id,
             -2,
             -1,
             false,
@@ -245,7 +248,8 @@ local function get_messages()
   local messages = {}
   local section_mark = Config.section_mark
   -- Read the conversation from the current buffer.
-  local conversation = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  local conversation =
+    vim.api.nvim_buf_get_lines(vim.api.nvim_get_current_buf(), 0, -1, false)
 
   -- In these messages, the 'user' and 'assistant' take turns.
   -- "Section marks" are used to distinguish between user and

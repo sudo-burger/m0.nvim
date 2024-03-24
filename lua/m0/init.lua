@@ -10,13 +10,16 @@ local Defaults = {
   openai_url = 'https://api.openai.com/v1/chat/completions',
   antrhopic_url = 'https://api.anthropic.com/v1/messages',
   anthropic_version = '2023-06-01',
-  max_tokens = 512,
+  max_tokens = 128,
+  temperature = 1,
+  stream = false,
 }
 local Current_backend = ''
 local Current_prompt = ''
 local API_keys = {}
 
 -- Util functions.
+-- Gets a key fron pass.
 function M.get_api_key(name)
   if API_keys[name] ~= nil then
     API_keys[name] = vim.fn.system('echo -n $(pass ' .. name .. ')')
@@ -24,84 +27,176 @@ function M.get_api_key(name)
   return API_keys[name]
 end
 
+-- The response is modeled differently, depending on the API.
+local function get_response_text(backend, data)
+  if backend == 'anthropic' then
+    return data.content[1].text
+  elseif backend == 'openai' then
+    return data.choices[1].message.content
+  end
+end
+-- Similarly, the streaminng deltas are modeled differently, depending on the API.
+-- Args:
+--   backend: anthropic | openai
+--   body: the body of the response.
+-- Returns:
+--   event, delta
+--   where:
+--   event: delta | done | cruft'
+--   delta: the delta text.
+--
+local function get_delta_text(backend, body)
+  if
+    (backend == 'openai' and body == 'data: [DONE]')
+    or (backend == 'anthropic' and body == 'event: message_stop')
+  then
+    return 'done', nil
+  end
+
+  if string.find(body, '^data: ') == nil then
+    -- Not a data package. Skip.
+    return 'cruft', nil
+  end
+
+  -- We are in a 'data: ' package now.
+  -- Extract and return the text payload.
+  --
+  local j = vim.fn.json_decode(string.sub(body, 7))
+  if backend == 'anthropic' and j.type == 'content_block_delta' then
+    return 'delta', j.delta.text
+  elseif backend == 'openai' and j.object == 'chat.completion.chunk' then
+    return 'delta', j.choices[1].delta.content
+  else
+    return 'other', body
+  end
+end
+
 -- Generic backend.
 -- Args:
 --    backend: "anthropic" | "openai"
---    params: configuration table.
+--    params: backend-specific configuration table.
 --
-local function make_backend(backend, params)
-  if backend == nil or params == nil then
-    error 'No configuration. Bailing out.'
+-- Returns:
+-- A table including the backend-specific params and the function: run().
+--
+local function make_backend(backend, opts)
+  -- Sanity checks.
+  if backend ~= 'anthropic' and backend ~= 'openai' then
+    error('Invalid backend: ' .. backend)
   end
+  if opts == nil or opts.model == nil then
+    error 'Incomplete configuration. Bailing out.'
+  end
+
+  local url = nil
+  if backend == 'anthropic' then
+    url = opts.url or Defaults.antrhopic_url
+  elseif backend == 'openai' then
+    url = opts.url or Defaults.openai_url
+  end
+
+  local prompt = Config.prompts[Current_prompt]
+
+  -- Buld request headers.
+  --
+  local headers = {
+    content_type = 'application/json',
+  }
+  -- Authorization, prompt, and message structure differ slightly
+  -- between the Anthropic and OpenAI APIs.
+  if backend == 'anthropic' then
+    headers.x_api_key = opts.api_key
+    headers.anthropic_version = Defaults.anthropic_version
+  elseif backend == 'openai' then
+    headers.authorization = 'Bearer ' .. opts.api_key
+  end
+
+  -- Build request payload.
+  --
+  local body = {
+    model = opts.model,
+    temperature = opts.temperature or Defaults.temperature,
+    max_tokens = opts.max_tokens or Defaults.max_tokens,
+  }
+
+  if backend == 'anthropic' then
+    body.system = prompt
+  end
+
   return {
     run = function(messages)
-      -- Build the payload (or "data" in curl parlance).
-      -- Mandatory:
-      -- - max_tokens
-      -- - messages
-      -- - model (the user configuration is expected to set this; there is no default).
-      -- Optional:
-      -- - temperature
-      -- - prompt (note that Anthropic and OpenAI place this differently in the API calls).
-      local data = {}
-      data.max_tokens = (params.max_tokens or Defaults.max_tokens)
-      data.model = (params.model or '')
-      if params.temperature then
-        data.temperature = params.temperature
-      end
-      data.messages = messages
+      local curl = require 'plenary.curl'
 
-      local prompt = (Config.prompts[Current_prompt] or '')
-      local auth_param = ''
-      local url = ''
-
-      -- Authorization, prompt, and message structure differ slightly
-      -- between the Anthropic and OpenAI APIs.
-      if backend == 'anthropic' then
-        auth_param = 'x-api-key: ' .. (params.api_key or '')
-        data.system = prompt
-        url = params.url or Defaults.antrhopic_url
-      elseif backend == 'openai' then
-        auth_param = 'Authorization: Bearer ' .. (params.api_key or '')
+      if backend == 'openai' then
+        -- The OpenAI completions API requires the prompt to be the first message
+        -- (with role 'system'). Patch the messages here.
         table.insert(messages, 1, { role = 'system', content = prompt })
-        url = params.url or Defaults.openai_url
-      else
-        error('Unknown backend: ' .. backend, 2)
       end
+      body.messages = messages
 
-      local cmd = 'curl -s '
-        .. vim.fn.shellescape(url)
-        .. ' -d '
-        .. vim.fn.shellescape(vim.fn.json_encode(data))
-        .. ' -H '
-        .. vim.fn.shellescape(auth_param)
-        .. ' -H '
-        .. vim.fn.shellescape 'Content-Type: application/json'
+      body.stream = Defaults.stream
 
-      -- Extra header required by the Anthropic API.
-      if backend == 'anthropic' then
-        cmd = cmd
-          .. ' -H '
-          .. vim.fn.shellescape(
-            'anthropic-version: '
-              .. (params.anthropic_version or Defaults.anthropic_version)
-          )
-      end
-
-      local response = vim.fn.system(cmd)
-      local json_response = vim.fn.json_decode(response)
-
-      local ret = {
-        error = json_response.error,
+      local curl_opts = {
+        headers = headers,
+        body = vim.fn.json_encode(body),
       }
-      if ret.error then
-        return ret
-      elseif backend == 'anthropic' then
-        ret.reply = (json_response.content[1].text or '')
-      elseif backend == 'openai' then
-        ret.reply = (json_response.choices[1].message.content or '')
+
+      local function print_section_mark()
+        vim.api.nvim_buf_set_lines(
+          0,
+          -1,
+          -1,
+          false,
+          { Config.section_mark, '' }
+        )
       end
-      return ret
+
+      -- Different callbacks needed, depending on whether streaming is enabled or not.
+      if Defaults.stream == true then
+        -- The streaming callback appends the reply deltas to the current buffer.
+        curl_opts.stream = vim.schedule_wrap(function(_, out, _)
+          local event, d = get_delta_text(backend, out)
+          if event == 'delta' and d then
+            vim.api.nvim_buf_set_lines(
+              0,
+              -2,
+              -1,
+              false,
+              -- { out, '' }
+              -- Add the delta to the current line.
+              vim.fn.split(
+                table.concat(vim.api.nvim_buf_get_lines(0, -2, -1, false)) .. d,
+                '\n',
+                true
+              )
+            )
+          elseif event == 'done' then
+            print_section_mark()
+          end
+        end)
+      else
+        -- When not streaming, we append the LLM's reply to the current buffer at one go.
+        curl_opts.callback = vim.schedule_wrap(function(out)
+          -- Build and print the reply in the current buffer.
+          -- The assistant reply is enclosed in "section marks".
+          vim.api.nvim_buf_set_lines(
+            0,
+            -2,
+            -1,
+            false,
+            vim.fn.split(
+              get_response_text(backend, vim.fn.json_decode(out.body)),
+              '\n'
+            )
+          )
+          print_section_mark()
+        end)
+      end
+
+      -- Start the response section.
+      -- Note that we prepare the next empty line for the reply.
+      print_section_mark()
+      curl.post(url, curl_opts)
     end,
   }
 end
@@ -143,12 +238,18 @@ function M.M0prompt(prompt)
   print('Prompt: ' .. Current_prompt)
 end
 
-function M.M0chat()
-  local conversation = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+local function get_messages_from_buffer()
   local messages = {}
   local section_mark = Config.section_mark
   local section_mark_len = string.len(section_mark)
+  -- Read the conversation from the current buffer.
+  local conversation = vim.api.nvim_buf_get_lines(0, 0, -1, false)
 
+  -- Transform the conversation into a series of 'messages',
+  -- as required by the APIs.
+  -- In these messages, the 'user' and 'assistant' take turns.
+  -- "Section marks" also used to distinguish between user and
+  -- assistant input when building the API calls.
   local i = 1
   local role = {
     'user',
@@ -156,9 +257,11 @@ function M.M0chat()
   }
   local role_idx = 1
   while i <= #conversation do
-    -- Switch between roles when meeting a section mark in the conversattion.
+    -- Switch between roles when meeting a section mark in the conversation.
     if conversation[i]:sub(1, section_mark_len) == section_mark then
+      -- Next row.
       i = i + 1
+      -- Switch role.
       if role_idx == 1 then
         role_idx = 2
       else
@@ -166,8 +269,8 @@ function M.M0chat()
       end
     end
 
+    -- Build a message.
     local message = { role = role[role_idx], content = '' }
-
     while
       i <= #conversation
       and conversation[i]:sub(1, section_mark_len) ~= section_mark
@@ -178,19 +281,16 @@ function M.M0chat()
 
     table.insert(messages, message)
   end
+  return messages
+end
 
-  local chat = make_backend(
+function M.M0chat()
+  local messages = get_messages_from_buffer()
+  local backend = make_backend(
     Config.backends[Current_backend].type,
     Config.backends[Current_backend]
   )
-  local result = chat.run(messages)
-  if result.error then
-    error(result.error.message)
-  elseif result.reply then
-    show_reply(result.reply)
-  else
-    error 'Unable to get response.'
-  end
+  backend.run(messages)
 end
 
 function M.setup(user_config)

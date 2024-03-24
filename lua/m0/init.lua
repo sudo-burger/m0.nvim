@@ -238,43 +238,40 @@ function M.M0prompt(prompt)
   print('Prompt: ' .. Current_prompt)
 end
 
-local function get_messages_from_buffer()
+-- Transform the chat buffer into a list of 'messages',
+-- as required by the APIs:
+-- [{ role = <user|assistant>, content = <str> }]
+local function get_messages()
   local messages = {}
   local section_mark = Config.section_mark
-  local section_mark_len = string.len(section_mark)
   -- Read the conversation from the current buffer.
   local conversation = vim.api.nvim_buf_get_lines(0, 0, -1, false)
 
-  -- Transform the conversation into a series of 'messages',
-  -- as required by the APIs.
   -- In these messages, the 'user' and 'assistant' take turns.
-  -- "Section marks" also used to distinguish between user and
+  -- "Section marks" are used to distinguish between user and
   -- assistant input when building the API calls.
   local i = 1
   local role = {
     'user',
     'assistant',
   }
+  -- Assume the first message to be the user's.
   local role_idx = 1
   while i <= #conversation do
     -- Switch between roles when meeting a section mark in the conversation.
-    if conversation[i]:sub(1, section_mark_len) == section_mark then
-      -- Next row.
-      i = i + 1
+    if conversation[i] == section_mark then
       -- Switch role.
       if role_idx == 1 then
         role_idx = 2
       else
         role_idx = 1
       end
+      i = i + 1
     end
 
     -- Build a message.
     local message = { role = role[role_idx], content = '' }
-    while
-      i <= #conversation
-      and conversation[i]:sub(1, section_mark_len) ~= section_mark
-    do
+    while i <= #conversation and conversation[i] ~= section_mark do
       message.content = message.content .. conversation[i] .. '\n'
       i = i + 1
     end
@@ -285,7 +282,7 @@ local function get_messages_from_buffer()
 end
 
 function M.M0chat()
-  local messages = get_messages_from_buffer()
+  local messages = get_messages()
   local backend = make_backend(
     Config.backends[Current_backend].type,
     Config.backends[Current_backend]

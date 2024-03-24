@@ -19,15 +19,17 @@ local Current_prompt = ''
 local API_keys = {}
 
 -- Util functions.
--- Gets a key fron pass.
-function M.get_api_key(name)
-  if API_keys[name] ~= nil then
-    API_keys[name] = vim.fn.system('echo -n $(pass ' .. name .. ')')
-  end
-  return API_keys[name]
+local function get_current_prompt()
+  return Config.prompts[Current_prompt]
 end
 
 -- The response is modeled differently, depending on the API.
+-- Args:
+--   backend: anthropic | openai
+--   data: the response data, converted from json.
+-- Returns:
+--   The response text.
+--
 local function get_response_text(backend, data)
   if backend == 'anthropic' then
     return data.content[1].text
@@ -35,10 +37,11 @@ local function get_response_text(backend, data)
     return data.choices[1].message.content
   end
 end
+
 -- Similarly, the streaminng deltas are modeled differently, depending on the API.
 -- Args:
 --   backend: anthropic | openai
---   body: the body of the response.
+--   body: the raw body of the response.
 -- Returns:
 --   event, delta
 --   where:
@@ -77,11 +80,10 @@ end
 
 -- Generic backend.
 -- Args:
---    backend: "anthropic" | "openai"
---    params: backend-specific configuration table.
---
+--   backend: "anthropic" | "openai"
+--   params: backend-specific configuration table.
 -- Returns:
--- A table including the backend-specific params and the function: run().
+--   A table including the backend-specific params and the function: run().
 --
 local function make_backend(backend, opts)
   -- Sanity checks.
@@ -98,8 +100,6 @@ local function make_backend(backend, opts)
   elseif backend == 'openai' then
     url = opts.url or Defaults.openai_url
   end
-
-  local prompt = Config.prompts[Current_prompt]
 
   -- Buld request headers.
   --
@@ -124,7 +124,7 @@ local function make_backend(backend, opts)
   }
 
   if backend == 'anthropic' then
-    body.system = prompt
+    body.system = get_current_prompt()
   end
 
   return {
@@ -134,7 +134,11 @@ local function make_backend(backend, opts)
       if backend == 'openai' then
         -- The OpenAI completions API requires the prompt to be the first message
         -- (with role 'system'). Patch the messages here.
-        table.insert(messages, 1, { role = 'system', content = prompt })
+        table.insert(
+          messages,
+          1,
+          { role = 'system', content = get_current_prompt() }
+        )
       end
       body.messages = messages
 
@@ -197,23 +201,11 @@ local function make_backend(backend, opts)
         end)
       end
 
-      -- Start the response section.
-      -- Note that we prepare the next empty line for the reply.
       print_section_mark()
+      -- The closing section mark is printed by the curl callbacks.
       curl.post(url, curl_opts)
     end,
   }
-end
-
-local function show_reply(reply)
-  -- Build and print the reply in the current buffer.
-  -- The reply is enclosed in "section_marks".
-  -- The section marks are also used to distinguish between
-  -- user and assistant input when building the API calls.
-  local section_mark = Config.section_mark
-  vim.api.nvim_buf_set_lines(0, -1, -1, false, { section_mark })
-  vim.api.nvim_buf_set_lines(0, -1, -1, false, vim.fn.split(reply, '\n'))
-  vim.api.nvim_buf_set_lines(0, -1, -1, false, { section_mark })
 end
 
 -- Exported functions.
@@ -348,5 +340,13 @@ end, {
 vim.api.nvim_create_user_command('M0chat', function()
   M.M0chat()
 end, { nargs = 0 })
+
+-- Gets a key fron pass.
+function M.get_api_key(name)
+  if API_keys[name] ~= nil then
+    API_keys[name] = vim.fn.system('echo -n $(pass ' .. name .. ')')
+  end
+  return API_keys[name]
+end
 
 return M

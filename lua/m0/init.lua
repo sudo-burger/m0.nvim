@@ -22,6 +22,12 @@ local API_keys = {}
 local function get_current_prompt()
   return Config.prompts[Current_prompt]
 end
+local function get_current_backend_opts()
+  return Config.backends[Current_backend]
+end
+local function get_current_backend_type()
+  return Config.backends[Current_backend].type
+end
 
 -- The response is modeled differently, depending on the API.
 -- Args:
@@ -139,7 +145,7 @@ local function make_backend(backend, opts)
       end
       body.messages = messages
 
-      body.stream = Config.backends[Current_backend].stream or Defaults.stream
+      body.stream = get_current_backend_opts().stream or Defaults.stream
 
       local curl_opts = {
         headers = headers,
@@ -180,7 +186,8 @@ local function make_backend(backend, opts)
           end
         end)
       else
-        -- When not streaming, we append the LLM's reply to the current buffer at one go.
+        -- Mot streaming.
+        -- We append the LLM's reply to the current buffer at one go.
         curl_opts.callback = vim.schedule_wrap(function(out)
           -- Build and print the reply in the current buffer.
           -- The assistant reply is enclosed in "section marks".
@@ -276,10 +283,8 @@ end
 
 function M.M0chat()
   local messages = get_messages()
-  local backend = make_backend(
-    Config.backends[Current_backend].type,
-    Config.backends[Current_backend]
-  )
+  local backend =
+    make_backend(get_current_backend_type(), get_current_backend_opts())
   backend.run(messages)
 end
 

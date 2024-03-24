@@ -325,6 +325,7 @@ end, {
     for k, _ in pairs(Config.prompts) do
       table.insert(ret, k)
     end
+    table.sort(ret)
     return ret
   end,
 })
@@ -338,6 +339,7 @@ end, {
     for k, _ in pairs(Config.backends) do
       table.insert(ret, k)
     end
+    table.sort(ret)
     return ret
   end,
 })

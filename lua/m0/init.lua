@@ -83,7 +83,7 @@ end
 --   backend: "anthropic" | "openai"
 --   params: backend-specific configuration table.
 -- Returns:
---   A table including the backend-specific params and the function: run().
+--   A table including the backend-specific function: run().
 --
 local function make_backend(backend, opts)
   -- Sanity checks.
@@ -122,15 +122,12 @@ local function make_backend(backend, opts)
     temperature = opts.temperature or Defaults.temperature,
     max_tokens = opts.max_tokens or Defaults.max_tokens,
   }
-
   if backend == 'anthropic' then
     body.system = get_current_prompt()
   end
 
   return {
     run = function(messages)
-      local curl = require 'plenary.curl'
-
       if backend == 'openai' then
         -- The OpenAI completions API requires the prompt to be the first message
         -- (with role 'system'). Patch the messages here.
@@ -203,7 +200,7 @@ local function make_backend(backend, opts)
 
       print_section_mark()
       -- The closing section mark is printed by the curl callbacks.
-      curl.post(url, curl_opts)
+      require('plenary.curl').post(url, curl_opts)
     end,
   }
 end

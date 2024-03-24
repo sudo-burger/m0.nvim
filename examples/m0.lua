@@ -14,6 +14,7 @@ return {
           type = 'openai',
           api_key = require('m0').get_api_key 'api.openai.com/key-0',
           model = 'gpt-3.5-turbo',
+          stream = true,
         },
         ['anthropic:claude-3-haiku'] = {
           type = 'anthropic',

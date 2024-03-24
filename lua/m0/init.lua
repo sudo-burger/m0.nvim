@@ -134,7 +134,7 @@ local function make_backend(backend, opts)
       end
       body.messages = messages
 
-      body.stream = Defaults.stream
+      body.stream = Config.backends[Current_backend].stream or Defaults.stream
 
       local curl_opts = {
         headers = headers,
@@ -152,7 +152,7 @@ local function make_backend(backend, opts)
       end
 
       -- Different callbacks needed, depending on whether streaming is enabled or not.
-      if Defaults.stream == true then
+      if body.stream == true then
         -- The streaming callback appends the reply deltas to the current buffer.
         curl_opts.stream = vim.schedule_wrap(function(_, out, _)
           local event, d = get_delta_text(backend, out)

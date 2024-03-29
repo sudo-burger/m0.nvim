@@ -293,8 +293,7 @@ function M.M0chat()
 end
 
 function M.setup(user_config)
-  user_config = user_config or {}
-  Config = vim.tbl_extend('force', Config, user_config)
+  Config = vim.tbl_extend('force', Config, user_config or {})
   Current_backend = Config.default_backend
   if Config.backends[Current_backend] == nil then
     error(

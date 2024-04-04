@@ -154,14 +154,28 @@ local function make_backend(backend, opts)
         body = vim.fn.json_encode(body),
       }
 
-      local function print_section_mark()
+      local function append_lines(lines)
+        vim.api.nvim_buf_set_lines(buf_id, -1, -1, false, lines)
+      end
+
+      local function get_last_line()
+        return table.concat(vim.api.nvim_buf_get_lines(buf_id, -2, -1, false))
+      end
+
+      local function set_last_line(txt)
         vim.api.nvim_buf_set_lines(
           buf_id,
-          -1,
+          -2,
           -1,
           false,
-          { Config.section_mark, '' }
+          -- If the input contains multiple lines,
+          -- split them as required by nvim_buf_get_lines()
+          vim.fn.split(txt, '\n', true)
         )
+      end
+
+      local function print_section_mark()
+        append_lines { Config.section_mark, '' }
       end
 
       -- Different callbacks needed, depending on whether streaming is enabled or not.
@@ -170,20 +184,8 @@ local function make_backend(backend, opts)
         curl_opts.stream = vim.schedule_wrap(function(_, out, _)
           local event, d = get_delta_text(backend, out)
           if event == 'delta' and d then
-            vim.api.nvim_buf_set_lines(
-              buf_id,
-              -2,
-              -1,
-              false,
-              -- { out, '' }
-              -- Add the delta to the current line.
-              vim.fn.split(
-                table.concat(vim.api.nvim_buf_get_lines(buf_id, -2, -1, false))
-                  .. d,
-                '\n',
-                true
-              )
-            )
+            -- Add the delta to the current line.
+            set_last_line(get_last_line() .. d)
           elseif event == 'done' then
             print_section_mark()
           end
@@ -193,16 +195,8 @@ local function make_backend(backend, opts)
         -- We append the LLM's reply to the current buffer at one go.
         curl_opts.callback = vim.schedule_wrap(function(out)
           -- Build and print the reply in the current buffer.
-          -- The assistant reply is enclosed in "section marks".
-          vim.api.nvim_buf_set_lines(
-            buf_id,
-            -2,
-            -1,
-            false,
-            vim.fn.split(
-              get_response_text(backend, vim.fn.json_decode(out.body)),
-              '\n'
-            )
+          set_last_line(
+            get_response_text(backend, vim.fn.json_decode(out.body))
           )
           print_section_mark()
         end)

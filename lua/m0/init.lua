@@ -188,6 +188,9 @@ local function make_backend(backend, opts)
             set_last_line(get_last_line() .. d)
           elseif event == 'done' then
             print_section_mark()
+          else
+            -- If we are here we probably received error messages from the server or API.
+            append_lines { out }
           end
         end)
       else

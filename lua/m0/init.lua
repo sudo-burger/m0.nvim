@@ -36,11 +36,20 @@ end
 -- Returns:
 --   The response text.
 --
-local function get_response_text(backend, data)
-  if backend == 'anthropic' then
-    return data.content[1].text
-  elseif backend == 'openai' then
-    return data.choices[1].message.content
+local function get_response_text_anthropic(data)
+  local j = vim.fn.json_decode(data)
+  if j ~= nil and j.content ~= nil then
+    return j.content[1].text
+  else
+    return data
+  end
+end
+local function get_response_text_openai(data)
+  local j = vim.fn.json_decode(data)
+  if j ~= nil and j.choices ~= nil then
+    return j.choices[1].message.content
+  else
+    return data
   end
 end
 
@@ -49,36 +58,58 @@ end
 --   backend: anthropic | openai
 --   body: the raw body of the response.
 -- Returns:
---   event, delta
+--   event, data
 --   where:
---   event: delta | done | cruft'
---   delta: the delta text.
+--   event: delta | done | cruft | other'
+--   data: the delta text (for delta), or nil (for done, cruft), or the http body (for other).
 --
-local function get_delta_text(backend, body)
-  if
-    (backend == 'openai' and body == 'data: [DONE]')
-    or (backend == 'anthropic' and body == 'event: message_stop')
-  then
+local function get_delta_text_openai(body)
+  if body == 'data: [DONE]' then
     return 'done', nil
   end
 
-  if string.find(body, '^data: ') == nil then
-    -- Not a data package. Skip.
+  if body == '\n' or body == '' then
     return 'cruft', nil
   end
 
-  -- We are in a 'data: ' package now.
-  -- Extract and return the text payload.
-  --
-  local j = vim.fn.json_decode(string.sub(body, 7))
-  ---@diagnostic disable-next-line: need-check-nil, undefined-field
-  if backend == 'anthropic' and j.type == 'content_block_delta' then
-    ---@diagnostic disable-next-line: need-check-nil, undefined-field
-    return 'delta', j.delta.text
-  ---@diagnostic disable-next-line: need-check-nil, undefined-field
-  elseif backend == 'openai' and j.object == 'chat.completion.chunk' then
-    ---@diagnostic disable-next-line: need-check-nil, undefined-field
-    return 'delta', j.choices[1].delta.content
+  if string.find(body, '^data: ') ~= nil then
+    -- We are in a 'data: ' package now.
+    -- Extract and return the text payload.
+    --
+    -- The last message in an openai delta will have:
+    --   choices[1].delta == {}
+    --   choices[1].finish_reason == 'stop'
+    --
+    local j = vim.fn.json_decode(string.sub(body, 7))
+    if
+      j ~= nil
+      and j.object == 'chat.completion.chunk'
+      and j.choices[1].delta.content ~= nil
+    then
+      return 'delta', j.choices[1].delta.content
+    end
+  else
+    return 'other', body
+  end
+end
+
+local function get_delta_text_anthropic(body)
+  if body == 'event: message_stop' then
+    return 'done', nil
+  end
+
+  if body == '\n' or body == '' then
+    return 'cruft', nil
+  end
+
+  if string.find(body, '^data: ') ~= nil then
+    -- We are in a 'data: ' package now.
+    -- Extract and return the text payload.
+    --
+    local j = vim.fn.json_decode(string.sub(body, 7))
+    if j ~= nil and j.type == 'content_block_delta' and j.delta.text ~= nil then
+      return 'delta', j.delta.text
+    end
   else
     return 'other', body
   end
@@ -105,6 +136,17 @@ local function make_backend(backend, opts)
     url = opts.url or Defaults.antrhopic_url
   elseif backend == 'openai' then
     url = opts.url or Defaults.openai_url
+  end
+
+  -- Set helper functions.
+  local get_delta_text = nil
+  local get_response_text = nil
+  if backend == 'openai' then
+    get_delta_text = get_delta_text_openai
+    get_response_text = get_response_text_openai
+  elseif backend == 'anthropic' then
+    get_delta_text = get_delta_text_anthropic
+    get_response_text = get_response_text_anthropic
   end
 
   -- Buld request headers.
@@ -145,6 +187,7 @@ local function make_backend(backend, opts)
           { role = 'system', content = get_current_prompt() }
         )
       end
+
       body.messages = messages
 
       body.stream = get_current_backend_opts().stream or Defaults.stream
@@ -182,15 +225,18 @@ local function make_backend(backend, opts)
       if body.stream == true then
         -- The streaming callback appends the reply deltas to the current buffer.
         curl_opts.stream = vim.schedule_wrap(function(_, out, _)
-          local event, d = get_delta_text(backend, out)
+          local event, d = get_delta_text(out)
           if event == 'delta' and d then
             -- Add the delta to the current line.
             set_last_line(get_last_line() .. d)
+          elseif event == 'other' then
+            -- Could be an error.
+            ---@diagnostic disable-next-line: param-type-mismatch
+            append_lines(vim.fn.split(d, '\n', true))
           elseif event == 'done' then
             print_section_mark()
           else
-            -- If we are here we probably received error messages from the server or API.
-            append_lines { out }
+            return
           end
         end)
       else
@@ -198,9 +244,7 @@ local function make_backend(backend, opts)
         -- We append the LLM's reply to the current buffer at one go.
         curl_opts.callback = vim.schedule_wrap(function(out)
           -- Build and print the reply in the current buffer.
-          set_last_line(
-            get_response_text(backend, vim.fn.json_decode(out.body))
-          )
+          set_last_line(get_response_text(out.body))
           print_section_mark()
         end)
       end
@@ -229,6 +273,9 @@ function M.M0backend(backend)
     Current_backend = backend
   end
   print('Backend: ' .. Current_backend)
+  if get_current_backend_type() == nil then
+    error('Unable to find current backend type for ' .. Current_backend)
+  end
 end
 
 function M.M0prompt(prompt)
@@ -350,5 +397,29 @@ function M.get_api_key(name)
   end
   return API_keys[name]
 end
+
+-- vim.api.nvim_create_user_command('M0debug', function()
+--   local buf_id = vim.api.nvim_get_current_buf()
+--   local c = vim.inspect(Config)
+--   vim.api.nvim_buf_set_lines(buf_id, -1, -1, false, vim.fn.split(c, '\n', true))
+--   vim.api.nvim_buf_set_lines(
+--     buf_id,
+--     -1,
+--     -1,
+--     false,
+--     vim.fn.split('Current backend: ' .. Current_backend, '\n', true)
+--   )
+--   vim.api.nvim_buf_set_lines(
+--     buf_id,
+--     -1,
+--     -1,
+--     false,
+--     vim.fn.split(
+--       'Current backend type: ' .. get_current_backend_type(),
+--       '\n',
+--       true
+--     )
+--   )
+-- end, { nargs = 0 })
 
 return M

@@ -115,12 +115,12 @@ local function get_delta_text_anthropic(body)
   end
 end
 
--- Generic backend.
+-- Backend factory.
 -- Args:
 --   backend: "anthropic" | "openai"
 --   params: backend-specific configuration table.
 -- Returns:
---   A table including the backend-specific function: run().
+--   A table including the backend-specific implementation of the function run().
 --
 local function make_backend(backend, opts)
   -- Sanity checks.
@@ -149,7 +149,7 @@ local function make_backend(backend, opts)
     get_response_text = get_response_text_anthropic
   end
 
-  -- Buld request headers.
+  -- Build request headers.
   --
   local headers = {
     content_type = 'application/json',

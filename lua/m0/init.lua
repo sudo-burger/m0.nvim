@@ -115,6 +115,62 @@ local function get_delta_text_anthropic(body)
   end
 end
 
+-- Transform the chat buffer into a list of 'messages',
+-- as required by the APIs:
+-- [{ role = <user|assistant>, content = <str> }]
+local function get_messages()
+  local messages = {}
+  local section_mark = Config.section_mark
+  -- Read the conversation from the current buffer.
+  local conversation =
+    vim.api.nvim_buf_get_lines(vim.api.nvim_get_current_buf(), 0, -1, false)
+
+  -- In these messages, the 'user' and 'assistant' take turns.
+  -- "Section marks" are used to distinguish between user and
+  -- assistant input when building the API calls.
+  local i = 1
+  local role = {
+    'user',
+    'assistant',
+  }
+  -- Assume the first message to be the user's.
+  local role_idx = 1
+  while i <= #conversation do
+    -- Switch between roles when meeting a section mark in the conversation.
+    if conversation[i] == section_mark then
+      -- Switch role.
+      if role_idx == 1 then
+        role_idx = 2
+      else
+        role_idx = 1
+      end
+      i = i + 1
+    end
+
+    -- Build a message.
+    local message = { role = role[role_idx], content = '' }
+    while i <= #conversation and conversation[i] ~= section_mark do
+      message.content = message.content .. conversation[i] .. '\n'
+      i = i + 1
+    end
+
+    table.insert(messages, message)
+  end
+  return messages
+end
+
+local function get_messages_anthropic()
+  return get_messages()
+end
+local function get_messages_openai()
+  local messages = get_messages()
+  -- The OpenAI completions API requires the prompt to be
+  -- the first message (with role 'system').
+  -- Patch the messages here.
+  table.insert(messages, 1, { role = 'system', content = get_current_prompt() })
+  return messages
+end
+
 -- Backend factory.
 -- Args:
 --   backend: "anthropic" | "openai"
@@ -122,73 +178,25 @@ end
 -- Returns:
 --   A table including the backend-specific implementation of the function run().
 --
-local function make_backend(backend, opts)
+local function make_backend(
+  get_delta_text,
+  get_response_text,
+  get_messages,
+  url,
+  body,
+  headers,
+  opts
+)
   -- Sanity checks.
-  if backend ~= 'anthropic' and backend ~= 'openai' then
-    error('Invalid backend: ' .. backend)
-  end
   if opts == nil or opts.model == nil then
     error 'Incomplete configuration. Bailing out.'
   end
 
-  local url = nil
-  if backend == 'anthropic' then
-    url = opts.url or Defaults.antrhopic_url
-  elseif backend == 'openai' then
-    url = opts.url or Defaults.openai_url
-  end
-
-  -- Set helper functions.
-  local get_delta_text = nil
-  local get_response_text = nil
-  if backend == 'openai' then
-    get_delta_text = get_delta_text_openai
-    get_response_text = get_response_text_openai
-  elseif backend == 'anthropic' then
-    get_delta_text = get_delta_text_anthropic
-    get_response_text = get_response_text_anthropic
-  end
-
-  -- Build request headers.
-  --
-  local headers = {
-    content_type = 'application/json',
-  }
-  -- Authorization, prompt, and message structure differ slightly
-  -- between the Anthropic and OpenAI APIs.
-  if backend == 'anthropic' then
-    headers.x_api_key = opts.api_key
-    headers.anthropic_version = Defaults.anthropic_version
-  elseif backend == 'openai' then
-    headers.authorization = 'Bearer ' .. opts.api_key
-  end
-
-  -- Build request payload.
-  --
-  local body = {
-    model = opts.model,
-    temperature = opts.temperature or Defaults.temperature,
-    max_tokens = opts.max_tokens or Defaults.max_tokens,
-  }
-  if backend == 'anthropic' then
-    body.system = get_current_prompt()
-  end
-
   return {
-    run = function(messages)
+    run = function()
       local buf_id = vim.api.nvim_get_current_buf()
 
-      if backend == 'openai' then
-        -- The OpenAI completions API requires the prompt to be the first message
-        -- (with role 'system'). Patch the messages here.
-        table.insert(
-          messages,
-          1,
-          { role = 'system', content = get_current_prompt() }
-        )
-      end
-
-      body.messages = messages
+      body.messages = get_messages()
 
       body.stream = get_current_backend_opts().stream or Defaults.stream
 
@@ -256,17 +264,53 @@ local function make_backend(backend, opts)
   }
 end
 
--- Exported functions.
---
-
 -- backend constructors.
-function M.make_openai(params)
-  return make_backend('openai', params)
+local function make_openai(opts)
+  return make_backend(
+    get_delta_text_openai,
+    get_response_text_openai,
+    get_messages_openai,
+    opts.url or Defaults.openai_url,
+    -- Body
+    {
+      model = opts.model,
+      temperature = opts.temperature or Defaults.temperature,
+      max_tokens = opts.max_tokens or Defaults.max_tokens,
+    },
+    -- Headers.
+    {
+      content_type = 'application/json',
+      authorization = 'Bearer ' .. opts.api_key,
+    },
+    opts
+  )
 end
 
-function M.make_anthropic(params)
-  return make_backend('anthropic', params)
+local function make_anthropic(opts)
+  return make_backend(
+    get_delta_text_anthropic,
+    get_response_text_anthropic,
+    get_messages_anthropic,
+    opts.url or Defaults.antrhopic_url,
+    -- Body.
+    {
+      model = opts.model,
+      temperature = opts.temperature or Defaults.temperature,
+      max_tokens = opts.max_tokens or Defaults.max_tokens,
+      system = get_current_prompt(),
+    },
+    -- Headers.
+    {
+      content_type = 'application/json',
+      x_api_key = opts.api_key,
+      anthropic_version = Defaults.anthropic_version,
+    },
+    opts
+  )
 end
+
+-- Exported functions
+---------------------
 
 function M.M0backend(backend)
   if backend ~= nil and backend ~= '' then
@@ -285,55 +329,22 @@ function M.M0prompt(prompt)
   print('Prompt: ' .. Current_prompt)
 end
 
--- Transform the chat buffer into a list of 'messages',
--- as required by the APIs:
--- [{ role = <user|assistant>, content = <str> }]
-local function get_messages()
-  local messages = {}
-  local section_mark = Config.section_mark
-  -- Read the conversation from the current buffer.
-  local conversation =
-    vim.api.nvim_buf_get_lines(vim.api.nvim_get_current_buf(), 0, -1, false)
-
-  -- In these messages, the 'user' and 'assistant' take turns.
-  -- "Section marks" are used to distinguish between user and
-  -- assistant input when building the API calls.
-  local i = 1
-  local role = {
-    'user',
-    'assistant',
-  }
-  -- Assume the first message to be the user's.
-  local role_idx = 1
-  while i <= #conversation do
-    -- Switch between roles when meeting a section mark in the conversation.
-    if conversation[i] == section_mark then
-      -- Switch role.
-      if role_idx == 1 then
-        role_idx = 2
-      else
-        role_idx = 1
-      end
-      i = i + 1
-    end
-
-    -- Build a message.
-    local message = { role = role[role_idx], content = '' }
-    while i <= #conversation and conversation[i] ~= section_mark do
-      message.content = message.content .. conversation[i] .. '\n'
-      i = i + 1
-    end
-
-    table.insert(messages, message)
-  end
-  return messages
-end
-
 function M.M0chat()
   local messages = get_messages()
-  local backend =
-    make_backend(get_current_backend_type(), get_current_backend_opts())
-  backend.run(messages)
+  local backend_type = get_current_backend_type()
+  local opts = get_current_backend_opts()
+  local backend = nil
+
+  if backend_type == 'anthropic' then
+    backend = make_anthropic(opts)
+  elseif backend_type == 'openai' then
+    backend = make_openai(opts)
+  else
+    error('Invalid backend type: ' .. backend_type)
+    return nil
+  end
+
+  backend.run()
 end
 
 function M.setup(user_config)

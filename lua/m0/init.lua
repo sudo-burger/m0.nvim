@@ -29,6 +29,9 @@ local function get_current_backend_type()
   return Config.backends[Current_backend].type
 end
 
+-- Backend support functions
+-- -------------------------
+--
 -- The response is modeled differently, depending on the API.
 -- Args:
 --   backend: anthropic | openai
@@ -53,7 +56,7 @@ local function get_response_text_openai(data)
   end
 end
 
--- Similarly, the streaminng deltas are modeled differently, depending on the API.
+-- Similarly to responses, the streaminng deltas are modeled differently, depending on the API.
 -- Args:
 --   backend: anthropic | openai
 --   body: the raw body of the response.
@@ -310,7 +313,7 @@ local function make_anthropic(opts)
 end
 
 -- Exported functions
----------------------
+-- ------------------
 
 function M.M0backend(backend)
   if backend ~= nil and backend ~= '' then
@@ -369,6 +372,8 @@ function M.setup(user_config)
   end
 end
 
+-- User commands
+-- -------------
 vim.api.nvim_create_user_command('M0prompt', function(opts)
   M.M0prompt(opts.args)
 end, {

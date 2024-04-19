@@ -122,7 +122,12 @@ local function get_visual_selection()
   local buf = vim.api.nvim_get_current_buf()
   local sline = vim.fn.getpos('v')[2]
   local eline = vim.fn.getpos('.')[2]
-  return vim.api.nvim_buf_get_lines(buf, sline - 1, eline, false)
+  return vim.api.nvim_buf_get_lines(
+    buf,
+    math.min(sline, eline) - 1,
+    math.max(sline, eline),
+    false
+  )
 end
 -- Transform the chat buffer into a list of 'messages',
 -- as required by the APIs:

@@ -119,36 +119,36 @@ local function get_delta_text_anthropic(body)
 end
 
 local function get_visual_selection()
-  local buf = vim.api.nvim_get_current_buf()
-  local sline = vim.fn.getpos('v')[2]
-  local eline = vim.fn.getpos('.')[2]
+  local sline = vim.fn.line 'v'
+  local eline = vim.fn.line '.'
   return vim.api.nvim_buf_get_lines(
-    buf,
+    vim.api.nvim_get_current_buf(),
     math.min(sline, eline) - 1,
     math.max(sline, eline),
     false
   )
 end
--- Transform the chat buffer into a list of 'messages',
--- as required by the APIs:
--- [{ role = <user|assistant>, content = <str> }]
+
+-- Transform the chat text into a list of 'messages',
+-- with format: [{ role = <user|assistant>, content = <str> }]
+--
 local function get_messages()
   local messages = {}
   local section_mark = Config.section_mark
-  local buf = vim.api.nvim_get_current_buf()
-  local mode = vim.api.nvim_get_mode().mode
   local conversation = nil
 
+  local mode = vim.api.nvim_get_mode().mode
   if mode == 'v' or mode == 'V' then
+    -- Read the conversation from the visual selection.
     conversation = get_visual_selection()
   else
     -- Read the conversation from the current buffer.
-    conversation = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+    conversation =
+      vim.api.nvim_buf_get_lines(vim.api.nvim_get_current_buf(), 0, -1, false)
   end
 
-  -- In these messages, the 'user' and 'assistant' take turns.
-  -- "Section marks" are used to distinguish between user and
-  -- assistant input when building the API calls.
+  -- In conversations, the 'user' and 'assistant' take turns.
+  -- "Section marks" are used to signal the switches between the two roles.
   local i = 1
   local role = {
     'user',

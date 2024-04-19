@@ -333,7 +333,6 @@ function M.M0prompt(prompt)
 end
 
 function M.M0chat()
-  local messages = get_messages()
   local backend_type = get_current_backend_type()
   local opts = get_current_backend_opts()
   local backend = nil

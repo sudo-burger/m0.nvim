@@ -269,7 +269,7 @@ local function make_backend(
           end
         end)
       else
-        -- Mot streaming.
+        -- Not streaming.
         -- We append the LLM's reply to the current buffer at one go.
         curl_opts.callback = vim.schedule_wrap(function(out)
           -- Build and print the reply in the current buffer.
@@ -278,8 +278,9 @@ local function make_backend(
         end)
       end
 
-      print_section_mark()
+      -- Mark the start of a reply section.
       -- The closing section mark is printed by the curl callbacks.
+      print_section_mark()
       require('plenary.curl').post(url, curl_opts)
     end,
   }

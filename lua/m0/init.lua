@@ -444,7 +444,11 @@ end
 --     -1,
 --     -1,
 --     false,
---     vim.fn.split('Current backend: ' .. Current_backend, '\n', true)
+--     vim.fn.split(
+--       'Current backend: ' .. vim.inspect(Current_backend),
+--       '\n',
+--       true
+--     )
 --   )
 --   vim.api.nvim_buf_set_lines(
 --     buf_id,

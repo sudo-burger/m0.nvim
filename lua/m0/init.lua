@@ -1,7 +1,7 @@
 local M = {}
 local Config = {
   backends = {},
-  default_backend = '',
+  default_backend_name = '',
   prompts = {},
   default_prompt = '',
   section_mark = '-------',
@@ -14,7 +14,8 @@ local Defaults = {
   temperature = 1,
   stream = false,
 }
-local Current_backend = ''
+local Current_backend = nil
+local Current_backend_name = ''
 local Current_prompt = ''
 local API_keys = {}
 
@@ -23,10 +24,10 @@ local function get_current_prompt()
   return Config.prompts[Current_prompt]
 end
 local function get_current_backend_opts()
-  return Config.backends[Current_backend]
+  return Config.backends[Current_backend_name]
 end
 local function get_current_backend_type()
-  return Config.backends[Current_backend].type
+  return Config.backends[Current_backend_name].type
 end
 
 -- Backend support functions
@@ -334,13 +335,26 @@ end
 -- Exported functions
 -- ------------------
 
-function M.M0backend(backend)
-  if backend ~= nil and backend ~= '' then
-    Current_backend = backend
+function M.M0backend(backend_name)
+  if backend_name ~= nil and backend_name ~= '' then
+    Current_backend_name = backend_name
   end
-  print('Backend: ' .. Current_backend)
-  if get_current_backend_type() == nil then
-    error('Unable to find current backend type for ' .. Current_backend)
+  print('Backend: ' .. Current_backend_name)
+  local backend_type = get_current_backend_type()
+  if backend_type == nil then
+    error('Unable to find type for backend: ' .. Current_backend_name)
+  end
+  local opts = get_current_backend_opts()
+  if opts == nil then
+    error('Unable to find opts for backend: ' .. Current_backend_name)
+  end
+  if backend_type == 'anthropic' then
+    Current_backend = make_anthropic(opts)
+  elseif backend_type == 'openai' then
+    Current_backend = make_openai(opts)
+  else
+    error('Invalid backend type: ' .. backend_type)
+    return nil
   end
 end
 
@@ -352,29 +366,17 @@ function M.M0prompt(prompt)
 end
 
 function M.M0chat()
-  local backend_type = get_current_backend_type()
-  local opts = get_current_backend_opts()
-  local backend = nil
-
-  if backend_type == 'anthropic' then
-    backend = make_anthropic(opts)
-  elseif backend_type == 'openai' then
-    backend = make_openai(opts)
-  else
-    error('Invalid backend type: ' .. backend_type)
-    return nil
-  end
-
-  backend.run()
+  ---@diagnostic disable-next-line: undefined-field
+  Current_backend.run()
 end
 
 function M.setup(user_config)
   Config = vim.tbl_extend('force', Config, user_config or {})
-  Current_backend = Config.default_backend
-  if Config.backends[Current_backend] == nil then
+  Current_backend_name = Config.default_backend_name
+  if Config.backends[Current_backend_name] == nil then
     error(
       'Current_backend ('
-        .. Current_backend
+        .. Current_backend_name
         .. ') set to non-existing configuration.',
       2
     )
@@ -388,6 +390,7 @@ function M.setup(user_config)
       2
     )
   end
+  M.M0backend(Current_backend_name)
 end
 
 -- User commands

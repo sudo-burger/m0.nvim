@@ -31,12 +31,12 @@ return {
           temperature = 0.7,
         },
       },
-      default_backend = 'anthropic:claude-3-haiku',
+      default_backend_name = 'anthropic:claude-3-haiku',
       prompts = {
         ['Charles Bukowski'] = 'You are now Charles Bukowski.',
         ['Marilyn Monroe'] = 'Assume the role of Marilyn Monroe.',
       },
-      default_prompt = 'Marilyn Monroe',
+      default_prompt_name = 'Marilyn Monroe',
     }
   end,
 }

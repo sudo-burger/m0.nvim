@@ -3,7 +3,7 @@ local Config = {
   backends = {},
   default_backend_name = '',
   prompts = {},
-  default_prompt = '',
+  default_prompt_name = '',
   section_mark = '-------',
 }
 local Defaults = {

@@ -102,7 +102,7 @@ local function get_delta_text_anthropic(body)
     return 'done', nil
   end
 
-  if body == '\n' or body == '' then
+  if body == '\n' or body == '' or string.find(body, '^event: ') ~= nil then
     return 'cruft', nil
   end
 

@@ -195,8 +195,14 @@ end
 
 -- Backend factory.
 -- Args:
---   backend: "anthropic" | "openai"
---   params: backend-specific configuration table.
+--   get_delta_text: a unction to parse and return an API response delta
+--     when streaminng.
+--   get_response_text: a function to parse and return an API response when
+--      not streaming.
+--   get_messages: a function to extract messages from the current conversation.
+--   url: API url.
+--   body: API-specific request body.
+--   headers: API-specific headers.
 -- Returns:
 --   A table including the backend-specific implementation of the function run().
 --
@@ -206,14 +212,8 @@ local function make_backend(
   get_messages,
   url,
   body,
-  headers,
-  opts
+  headers
 )
-  -- Sanity checks.
-  if opts == nil or opts.model == nil then
-    error 'Incomplete configuration. Bailing out.'
-  end
-
   return {
     run = function()
       local buf_id = vim.api.nvim_get_current_buf()
@@ -304,8 +304,7 @@ local function make_openai(opts)
     {
       content_type = 'application/json',
       authorization = 'Bearer ' .. opts.api_key,
-    },
-    opts
+    }
   )
 end
 
@@ -327,8 +326,7 @@ local function make_anthropic(opts)
       content_type = 'application/json',
       x_api_key = opts.api_key,
       anthropic_version = Defaults.anthropic_version,
-    },
-    opts
+    }
   )
 end
 

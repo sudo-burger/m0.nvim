@@ -333,6 +333,9 @@ end
 -- Exported functions
 -- ------------------
 
+---Select backend interactively.
+---@param backend_name string
+---@return nil
 function M.M0backend(backend_name)
   if backend_name ~= nil and backend_name ~= '' then
     Current_backend_name = backend_name

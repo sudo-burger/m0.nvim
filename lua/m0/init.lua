@@ -352,7 +352,6 @@ function M.M0backend(backend_name)
     Current_backend = make_openai(opts)
   else
     error('Invalid backend type: ' .. backend_type)
-    return nil
   end
 end
 

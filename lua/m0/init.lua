@@ -14,33 +14,41 @@ local Defaults = {
   temperature = 1,
   stream = false,
 }
+---@class Backend
+---@field run fun():nil
 local Current_backend = nil
+---@type string
 local Current_backend_name = ''
-local Current_prompt = ''
+---@type string
 local Current_prompt_name = ''
+---@type table
 local API_keys = {}
 
 -- Util functions.
+---comment
+---@return string
 local function get_current_prompt()
   return Config.prompts[Current_prompt_name]
 end
+---comment
+---@return table
 local function get_current_backend_opts()
   return Config.backends[Current_backend_name]
 end
+---comment
+---@return string
 local function get_current_backend_type()
   return Config.backends[Current_backend_name].type
 end
 
 -- Backend support functions
 -- -------------------------
---
 -- The response is modeled differently, depending on the API.
--- Args:
---   backend: anthropic | openai
---   data: the response data, converted from json.
--- Returns:
---   The response text.
---
+
+---Get the text of an Anthorpic API response.
+---If the API response cannot be parsed, return the response as-is.
+---@param data string The response data (normally a JSON)
+---@return string
 local function get_response_text_anthropic(data)
   local j = vim.fn.json_decode(data)
   if j ~= nil and j.content ~= nil then
@@ -49,6 +57,11 @@ local function get_response_text_anthropic(data)
     return data
   end
 end
+
+---Get the text of an OpenAI API response.
+---If the API response cannot be parsed, return the response as-is.
+---@param data string The response data (normally a JSON)
+---@return string
 local function get_response_text_openai(data)
   local j = vim.fn.json_decode(data)
   if j ~= nil and j.choices ~= nil then
@@ -58,16 +71,19 @@ local function get_response_text_openai(data)
   end
 end
 
--- Similarly to responses, the streaminng deltas are modeled differently, depending on the API.
--- Args:
---   backend: anthropic | openai
+-- Similarly to responses, the streaminng deltas are modeled differently
+-- depending on the API.
+
 --   body: the raw body of the response.
 -- Returns:
 --   event, data
 --   where:
---   event: delta | done | cruft | other'
---   data: the delta text (for delta), or nil (for done, cruft), or the http body (for other).
---
+---Returns event,data
+---where
+---  event: delta | done | cruft | other
+---  data: the delta text (for delta), or the http body for other events.
+---@param body string The raw body of the response.
+---@return string,string
 local function get_delta_text_openai(body)
   if body == 'data: [DONE]' then
     return 'done', nil
@@ -98,6 +114,12 @@ local function get_delta_text_openai(body)
   end
 end
 
+---Returns event,data
+---where
+---  event: delta | done | cruft | other
+---  data: the delta text (for delta), or the http body for other events.
+---@param body string The raw body of the response.
+---@return string,string
 local function get_delta_text_anthropic(body)
   if body == 'event: message_stop' then
     return 'done', nil
@@ -194,19 +216,17 @@ local function get_messages_openai()
   return messages
 end
 
--- Backend factory.
--- Args:
---   get_delta_text: a unction to parse and return an API response delta
---     when streaminng.
---   get_response_text: a function to parse and return an API response when
---      not streaming.
---   get_messages: a function to extract messages from the current conversation.
---   url: API url.
---   body: API-specific request body.
---   headers: API-specific headers.
--- Returns:
---   A table including the backend-specific implementation of the function run().
---
+---comment
+---Backend factory.
+---Returns a table including the backend-specific implementation of the function run().
+---
+---@param get_delta_text fun(string):table<string,string> A function to return an API response delta if streaminng.
+---@param get_response_text fun(table):string A function to return an API response if not streaming.
+---@param get_messages fun():table A function to extract messages from the current conversation.
+---@param url string API url.
+---@param body table API-specific request body.
+---@param headers table API-specific headers.
+---@return Backend
 local function make_backend(
   get_delta_text,
   get_response_text,
@@ -288,7 +308,13 @@ local function make_backend(
   }
 end
 
--- backend constructors.
+-- Backend constuctors
+-- -------------------
+
+---Make an OpenAI backend.
+---Returns a table that includes the run() function.
+---@param opts table Backend opts. Normally from the user configuration.
+---@return table
 local function make_openai(opts)
   return make_backend(
     get_delta_text_openai,
@@ -309,6 +335,10 @@ local function make_openai(opts)
   )
 end
 
+---Make an Anthropic backend.
+---Returns a table that includes the run() function.
+---@param opts table Backend opts. Normally from the user configuration.
+---@return table
 local function make_anthropic(opts)
   return make_backend(
     get_delta_text_anthropic,
@@ -361,9 +391,9 @@ function M.M0backend(backend_name)
   end
 end
 
-function M.M0prompt(prompt)
-  if prompt ~= nil and prompt ~= '' then
-    Current_prompt = prompt
+---Select prompt interactively.
+---@param prompt_name string
+---@return nil
 function M.M0prompt(prompt_name)
   if prompt_name ~= nil and prompt_name ~= '' then
     Current_prompt_name = prompt_name
@@ -371,8 +401,8 @@ function M.M0prompt(prompt_name)
   print('Prompt name: ' .. Current_prompt_name)
 end
 
+---Run a chat round.
 function M.M0chat()
-  ---@diagnostic disable-next-line: undefined-field
   Current_backend.run()
 end
 

@@ -340,7 +340,7 @@ function M.M0backend(backend_name)
   if backend_name ~= nil and backend_name ~= '' then
     Current_backend_name = backend_name
   end
-  print('Backend: ' .. Current_backend_name)
+  print('Backend name: ' .. Current_backend_name)
   local backend_type = get_current_backend_type()
   if backend_type == nil then
     error('Unable to find type for backend: ' .. Current_backend_name)
@@ -353,6 +353,8 @@ function M.M0backend(backend_name)
     Current_backend = make_anthropic(opts)
   elseif backend_type == 'openai' then
     Current_backend = make_openai(opts)
+  elseif backend_type == 'passthrough' then
+    Current_backend = make_passthrough(opts)
   else
     error('Invalid backend type: ' .. backend_type)
   end

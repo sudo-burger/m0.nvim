@@ -17,6 +17,7 @@ local Defaults = {
 local Current_backend = nil
 local Current_backend_name = ''
 local Current_prompt = ''
+local Current_prompt_name = ''
 local API_keys = {}
 
 -- Util functions.

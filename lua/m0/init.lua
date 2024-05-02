@@ -21,7 +21,7 @@ local API_keys = {}
 
 -- Util functions.
 local function get_current_prompt()
-  return Config.prompts[Current_prompt]
+  return Config.prompts[Current_prompt_name]
 end
 local function get_current_backend_opts()
   return Config.backends[Current_backend_name]
@@ -363,8 +363,11 @@ end
 function M.M0prompt(prompt)
   if prompt ~= nil and prompt ~= '' then
     Current_prompt = prompt
+function M.M0prompt(prompt_name)
+  if prompt_name ~= nil and prompt_name ~= '' then
+    Current_prompt_name = prompt_name
   end
-  print('Prompt: ' .. Current_prompt)
+  print('Prompt name: ' .. Current_prompt_name)
 end
 
 function M.M0chat()
@@ -383,11 +386,11 @@ function M.setup(user_config)
       2
     )
   end
-  Current_prompt = Config.default_prompt
-  if Config.prompts[Current_prompt] == nil then
+  Current_prompt_name = Config.default_prompt_name
+  if Config.prompts[Current_prompt_name] == nil then
     error(
-      'Current_prompt ('
-        .. Current_prompt
+      'Current_prompt_name ('
+        .. Current_prompt_name
         .. ') set to non-existing configuration.',
       2
     )

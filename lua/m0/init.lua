@@ -1,4 +1,5 @@
 local M = {}
+
 local Config = {
   backends = {},
   default_backend_name = '',
@@ -6,6 +7,7 @@ local Config = {
   default_prompt_name = '',
   section_mark = '-------',
 }
+
 local Defaults = {
   openai_url = 'https://api.openai.com/v1/chat/completions',
   antrhopic_url = 'https://api.anthropic.com/v1/messages',
@@ -14,6 +16,7 @@ local Defaults = {
   temperature = 1,
   stream = false,
 }
+
 ---@class Backend
 ---@field run fun():nil
 local Current_backend = nil
@@ -24,7 +27,9 @@ local Current_prompt_name = ''
 ---@type table
 local API_keys = {}
 
--- Util functions.
+-- Util functions
+-- --------------
+
 ---comment
 ---@return string
 local function get_current_prompt()

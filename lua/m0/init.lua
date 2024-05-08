@@ -166,7 +166,7 @@ end
 -- Transform the chat text into a list of 'messages',
 -- with format: [{ role = <user|assistant>, content = <str> }]
 --
-local function get_messages()
+local function get_messages_from_current_buffer()
   local messages = {}
   local section_mark = Config.section_mark
   local conversation = nil
@@ -215,14 +215,18 @@ local function get_messages()
 end
 
 local function get_messages_anthropic()
-  return get_messages()
+  return get_messages_from_current_buffer()
 end
 local function get_messages_openai()
-  local messages = get_messages()
+  local messages = get_messages_from_current_buffer()
   -- The OpenAI completions API requires the prompt to be
   -- the first message (with role 'system').
   -- Patch the messages here.
-  table.insert(messages, 1, { role = 'system', content = get_current_prompt() })
+  table.insert(
+    messages,
+    1,
+    { role = 'system', content = M.get_current_prompt() }
+  )
   return messages
 end
 

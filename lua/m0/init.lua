@@ -35,17 +35,17 @@ local API_keys = {}
 
 ---comment
 ---@return string
-local function get_current_prompt()
+function M.get_current_prompt()
   return Config.prompts[Current_prompt_name]
 end
 ---comment
 ---@return table
-local function get_current_backend_opts()
+function M.get_current_backend_opts()
   return Config.backends[Current_backend_name]
 end
 ---comment
 ---@return string
-local function get_current_backend_type()
+function M.get_current_backend_type()
   return Config.backends[Current_backend_name].type
 end
 
@@ -249,7 +249,7 @@ local function make_backend(
 
       body.messages = get_messages()
 
-      body.stream = get_current_backend_opts().stream or Defaults.stream
+      body.stream = M.get_current_backend_opts().stream or Defaults.stream
 
       local curl_opts = {
         headers = headers,
@@ -379,12 +379,11 @@ function M.M0backend(backend_name)
   if backend_name ~= nil and backend_name ~= '' then
     Current_backend_name = backend_name
   end
-  print('Backend name: ' .. Current_backend_name)
-  local backend_type = get_current_backend_type()
+  local backend_type = M.get_current_backend_type()
   if backend_type == nil then
     error('Unable to find type for backend: ' .. Current_backend_name)
   end
-  local opts = get_current_backend_opts()
+  local opts = M.get_current_backend_opts()
   if opts == nil then
     error('Unable to find opts for backend: ' .. Current_backend_name)
   end

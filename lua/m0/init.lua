@@ -82,10 +82,6 @@ end
 -- Similarly to responses, the streaminng deltas are modeled differently
 -- depending on the API.
 
---   body: the raw body of the response.
--- Returns:
---   event, data
---   where:
 ---Returns event,data
 ---where
 ---  event: delta | done | cruft | other
@@ -94,11 +90,11 @@ end
 ---@return string,string
 local function get_delta_text_openai(body)
   if body == 'data: [DONE]' then
-    return 'done', nil
+    return 'done', body
   end
 
   if body == '\n' or body == '' then
-    return 'cruft', nil
+    return 'cruft', body
   end
 
   if string.find(body, '^data: ') ~= nil then
@@ -120,6 +116,9 @@ local function get_delta_text_openai(body)
   else
     return 'other', body
   end
+  -- Not data, so most likely metadata that we only would want to see for
+  -- debugging purposes.
+  return 'cruft', body
 end
 
 ---Returns event,data
@@ -130,11 +129,11 @@ end
 ---@return string,string
 local function get_delta_text_anthropic(body)
   if body == 'event: message_stop' then
-    return 'done', nil
+    return 'done', body
   end
 
   if body == '\n' or body == '' or string.find(body, '^event: ') ~= nil then
-    return 'cruft', nil
+    return 'cruft', body
   end
 
   if string.find(body, '^data: ') ~= nil then
@@ -148,6 +147,9 @@ local function get_delta_text_anthropic(body)
   else
     return 'other', body
   end
+  -- Not data, so most likely metadata that we only would want to see for
+  -- debugging purposes.
+  return 'cruft', body
 end
 
 local function get_visual_selection()
@@ -285,10 +287,10 @@ local function make_backend(
         -- The streaming callback appends the reply deltas to the current buffer.
         curl_opts.stream = vim.schedule_wrap(function(_, out, _)
           local event, d = get_delta_text(out)
-          if event == 'delta' and d then
+          if event == 'delta' and d ~= '' then
             -- Add the delta to the current line.
             set_last_line(get_last_line() .. d)
-          elseif event == 'other' then
+          elseif event == 'other' and d ~= '' then
             -- Could be an error.
             ---@diagnostic disable-next-line: param-type-mismatch
             append_lines(vim.fn.split(d, '\n', true))

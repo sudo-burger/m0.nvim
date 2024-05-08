@@ -6,15 +6,18 @@ local Config = {
   prompts = {},
   default_prompt_name = '',
   section_mark = '-------',
+  default_max_tokens = 128,
+  default_temperature = 1,
+  default_stream = false,
 }
 
 local Defaults = {
   openai_url = 'https://api.openai.com/v1/chat/completions',
   antrhopic_url = 'https://api.anthropic.com/v1/messages',
   anthropic_version = '2023-06-01',
-  max_tokens = 128,
-  temperature = 1,
-  stream = false,
+  -- max_tokens = 128,
+  -- temperature = 1,
+  -- stream = false,
 }
 
 ---@class Backend
@@ -329,8 +332,8 @@ local function make_openai(opts)
     -- Body
     {
       model = opts.model,
-      temperature = opts.temperature or Defaults.temperature,
-      max_tokens = opts.max_tokens or Defaults.max_tokens,
+      temperature = opts.temperature or Config.default_temperature,
+      max_tokens = opts.max_tokens or Config.default_max_tokens,
     },
     -- Headers.
     {
@@ -353,9 +356,9 @@ local function make_anthropic(opts)
     -- Body.
     {
       model = opts.model,
-      temperature = opts.temperature or Defaults.temperature,
-      max_tokens = opts.max_tokens or Defaults.max_tokens,
-      system = get_current_prompt(),
+      temperature = opts.temperature or Config.default_temperature,
+      max_tokens = opts.max_tokens or Config.default_max_tokens,
+      system = M.get_current_prompt(),
     },
     -- Headers.
     {

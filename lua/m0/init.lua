@@ -397,8 +397,6 @@ function M.M0backend(backend_name)
     Current_backend = make_anthropic(opts)
   elseif backend_type == 'openai' then
     Current_backend = make_openai(opts)
-  elseif backend_type == 'passthrough' then
-    Current_backend = make_passthrough(opts)
   else
     error('Invalid backend type: ' .. backend_type)
   end
@@ -411,7 +409,6 @@ function M.M0prompt(prompt_name)
   if prompt_name ~= nil and prompt_name ~= '' then
     Current_prompt_name = prompt_name
   end
-  print('Prompt name: ' .. Current_prompt_name)
 end
 
 ---Run a chat round.
@@ -424,7 +421,7 @@ function M.setup(user_config)
   Current_backend_name = Config.default_backend_name
   if Config.backends[Current_backend_name] == nil then
     error(
-      'Current_backend ('
+      'Current_backend_name ('
         .. Current_backend_name
         .. ') set to non-existing configuration.',
       2

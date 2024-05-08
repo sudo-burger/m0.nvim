@@ -288,7 +288,7 @@ local function make_backend(
 
       -- Different callbacks needed, depending on whether streaming is enabled or not.
       if body.stream == true then
-        -- The streaming callback appends the reply deltas to the current buffer.
+        -- The streaming callback appends the reply to the current buffer.
         curl_opts.stream = vim.schedule_wrap(function(_, out, _)
           local event, d = get_delta_text(out)
           if event == 'delta' and d ~= '' then
@@ -296,11 +296,11 @@ local function make_backend(
             set_last_line(get_last_line() .. d)
           elseif event == 'other' and d ~= '' then
             -- Could be an error.
-            ---@diagnostic disable-next-line: param-type-mismatch
             append_lines(vim.fn.split(d, '\n', true))
           elseif event == 'done' then
             print_section_mark()
           else
+            -- Cruft or no data.
             return
           end
         end)
@@ -444,6 +444,7 @@ end
 
 -- User commands
 -- -------------
+
 vim.api.nvim_create_user_command('M0prompt', function(opts)
   M.M0prompt(opts.args)
 end, {

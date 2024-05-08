@@ -478,32 +478,15 @@ function M.get_api_key(name)
   return API_keys[name]
 end
 
--- vim.api.nvim_create_user_command('M0debug', function()
---   local buf_id = vim.api.nvim_get_current_buf()
---   local c = vim.inspect(Config)
---   vim.api.nvim_buf_set_lines(buf_id, -1, -1, false, vim.fn.split(c, '\n', true))
---   vim.api.nvim_buf_set_lines(
---     buf_id,
---     -1,
---     -1,
---     false,
---     vim.fn.split(
---       'Current backend: ' .. vim.inspect(Current_backend),
---       '\n',
---       true
---     )
---   )
---   vim.api.nvim_buf_set_lines(
---     buf_id,
---     -1,
---     -1,
---     false,
---     vim.fn.split(
---       'Current backend type: ' .. get_current_backend_type(),
---       '\n',
---       true
---     )
---   )
--- end, { nargs = 0 })
+function M.debug()
+  return 'Current backend name: '
+    .. (Current_backend_name or '')
+    .. '\nCurrent backend type: '
+    .. (M.get_current_backend_type() or '')
+    .. '\nCurrent prompt name: '
+    .. (Current_prompt_name or '')
+    .. '\nConfiguration: '
+    .. vim.inspect(Config)
+end
 
 return M

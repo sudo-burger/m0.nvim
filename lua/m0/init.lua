@@ -20,9 +20,9 @@ local Defaults = {
   -- stream = false,
 }
 
----@class Backend
----@field run fun():nil
-local Current_backend = nil
+---@class (exact) Backend
+---@field run fun(): nil
+local Current_backend = {}
 ---@type string
 local Current_backend_name = ''
 ---@type string

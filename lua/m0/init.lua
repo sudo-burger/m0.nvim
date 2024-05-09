@@ -47,29 +47,29 @@ end
 -- -------------------------
 -- The response is modeled differently, depending on the API.
 
----Get the text of an Anthorpic API response.
----If the API response cannot be parsed, return the response as-is.
+---Returns the text content of an API response.
+---Throws an error if the API response cannot be parsed.
 ---@param data string The response data (normally a JSON)
----@return string
+---@return string|nil text if available in the API response.
 local function get_response_text_anthropic(data)
   local j = vim.fn.json_decode(data)
   if j ~= nil and j.content ~= nil then
     return j.content[1].text
   else
-    return data
+    error('Received: ' .. data)
   end
 end
 
----Get the text of an OpenAI API response.
----If the API response cannot be parsed, return the response as-is.
+---Returns the text content of an API response.
+---Throws an error if the API response cannot be parsed.
 ---@param data string The response data (normally a JSON)
----@return string
+---@return string|nil text if available in the API response.
 local function get_response_text_openai(data)
   local j = vim.fn.json_decode(data)
   if j ~= nil and j.choices ~= nil then
     return j.choices[1].message.content
   else
-    return data
+    error('Received: ' .. data)
   end
 end
 

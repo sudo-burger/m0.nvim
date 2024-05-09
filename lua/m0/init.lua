@@ -9,15 +9,9 @@ local Config = {
   default_max_tokens = 128,
   default_temperature = 1,
   default_stream = false,
-}
-
-local Defaults = {
-  openai_url = 'https://api.openai.com/v1/chat/completions',
-  antrhopic_url = 'https://api.anthropic.com/v1/messages',
-  anthropic_version = '2023-06-01',
-  -- max_tokens = 128,
-  -- temperature = 1,
-  -- stream = false,
+  default_openai_url = 'https://api.openai.com/v1/chat/completions',
+  default_antrhopic_url = 'https://api.anthropic.com/v1/messages',
+  default_anthropic_version = '2023-06-01',
 }
 
 ---@class (exact) Backend
@@ -255,7 +249,7 @@ local function make_backend(
 
       body.messages = get_messages()
 
-      body.stream = M.get_current_backend_opts().stream or Defaults.stream
+      body.stream = M.get_current_backend_opts().stream or Config.default_stream
 
       local curl_opts = {
         headers = headers,
@@ -334,7 +328,7 @@ local function make_openai(opts)
     get_delta_text_openai,
     get_response_text_openai,
     get_messages_openai,
-    opts.url or Defaults.openai_url,
+    opts.url or Config.default_openai_url,
     -- Body
     {
       model = opts.model,
@@ -358,7 +352,7 @@ local function make_anthropic(opts)
     get_delta_text_anthropic,
     get_response_text_anthropic,
     get_messages_anthropic,
-    opts.url or Defaults.antrhopic_url,
+    opts.url or Config.default_antrhopic_url,
     -- Body.
     {
       model = opts.model,
@@ -370,7 +364,7 @@ local function make_anthropic(opts)
     {
       content_type = 'application/json',
       x_api_key = opts.api_key,
-      anthropic_version = Defaults.anthropic_version,
+      anthropic_version = Config.default_anthropic_version,
     }
   )
 end

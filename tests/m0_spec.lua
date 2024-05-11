@@ -1,5 +1,57 @@
 ---@diagnostic disable: undefined-global, undefined-field
+M0 = require 'm0'
 
+-- Invalid prompt.
+Opts = {
+  backends = {
+    ['openai:gpt-3.5-turbo'] = {
+      type = 'openai',
+      api_key = 'xxx',
+      model = 'gpt-3.5-turbo',
+      stream = true,
+    },
+  },
+  default_backend_name = 'openai:gpt-3.5-turbo',
+  prompts = {
+    ['Charles Bukowski'] = 'You are now Charles Bukowski.',
+  },
+  default_prompt_name = 'Marilyn Monroe',
+}
+
+describe('m0', function()
+  it('setup fails if the default prompt does not exist', function()
+    assert.has.errors(function()
+      M0.setup(Opts)
+    end)
+  end)
+end)
+
+-- Invalid backend.
+Opts = {
+  backends = {
+    ['openai:gpt-3.5-turbo'] = {
+      type = 'openai',
+      api_key = 'xxx',
+      model = 'gpt-3.5-turbo',
+      stream = true,
+    },
+  },
+  default_backend_name = 'xxx',
+  prompts = {
+    ['Charles Bukowski'] = 'You are now Charles Bukowski.',
+  },
+  default_prompt_name = 'Charles Bukowski',
+}
+
+describe('m0', function()
+  it('setup fails if the default backend does not exist', function()
+    assert.has.errors(function()
+      M0.setup(Opts)
+    end)
+  end)
+end)
+
+-- Valid configuration.
 Opts = {
   backends = {
     ['openai:gpt-3.5-turbo'] = {
@@ -31,45 +83,50 @@ Opts = {
   default_prompt_name = 'Marilyn Monroe',
 }
 
-M0 = require 'm0'
-M0.setup(Opts)
-
 describe('m0', function()
-  it('can be required', function()
-    require 'm0'
+  it('can be setup', function()
+    M0.setup(Opts)
   end)
 end)
 
 describe('m0', function()
   it('can debug', function()
-    M0.debug()
+    assert.has_no.errors(function()
+      local debug = M0.debug()
+      ---@diagnostic disable-next-line: unused-local
+      local len = string.len(debug)
+    end)
   end)
 end)
-
+--
 describe('m0', function()
   it('has an initial prompt', function()
-    assert(M0.get_current_prompt() == Opts.prompts[Opts.default_prompt_name])
+    assert(M0.State.prompt == Opts.prompts[Opts.default_prompt_name])
   end)
 end)
 
 describe('m0', function()
   it('can change the prompt', function()
     local new_prompt_name = 'Charles Bukowski'
-    local eprompt = Opts.prompts[new_prompt_name]
+    local expected = Opts.prompts[new_prompt_name]
 
     M0.M0prompt(new_prompt_name)
     assert(
-      eprompt == M0.get_current_prompt(),
-      'Expected: ' .. eprompt .. '. Actual: ' .. M0.get_current_prompt()
+      expected == M0.State.prompt,
+      'Expected: ' .. expected .. '. Actual: ' .. M0.State.prompt
     )
   end)
 end)
 
 describe('m0', function()
+  local expected = vim.inspect(Opts.backends[Opts.default_backend_name])
   it('has an initial backend', function()
     assert(
-      vim.inspect(M0.get_current_backend_opts()) ~= vim.inspect {},
-      'no current bakend opts.'
+      vim.inspect(M0.State.backend.opts) == expected,
+      'Expected: '
+        .. expected
+        .. '. Actual: '
+        .. vim.inspect(M0.State.backend.opts)
     )
   end)
 end)
@@ -100,7 +157,7 @@ describe('m0', function()
     describe(': the expected and actual backends', function()
       it('are equal', function()
         M0.M0backend(new_backend_name)
-        local abackend_opts = vim.inspect(M0.get_current_backend_opts() or {})
+        local abackend_opts = vim.inspect(M0.State.backend.opts or {})
         assert(
           ebackend_opts == abackend_opts,
           'Expected: ' .. ebackend_opts .. ' Actual: ' .. abackend_opts
@@ -110,7 +167,7 @@ describe('m0', function()
     describe(': restoring the default backend', function()
       it('can restore', function() end)
       M0.M0backend(Opts.default_backend_name)
-      local abackend_opts = vim.inspect(M0.get_current_backend_opts() or {})
+      local abackend_opts = vim.inspect(M0.State.backend.opts or {})
       assert(
         ibackend_opts == abackend_opts,
         'Expected: ' .. ibackend_opts .. ' Actual: ' .. abackend_opts

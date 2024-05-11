@@ -38,109 +38,6 @@ M.State = {
   api_keys = {},
 }
 
--- Backend support functions
--- -------------------------
--- The response is modeled differently, depending on the API.
-
----Returns the text content of an API response.
----Throws an error if the API response cannot be parsed.
----@param data string The response data. Normally a JSON.
----@return string|nil text The API response text, if available.
-local function get_response_text_anthropic(data)
-  local j = vim.fn.json_decode(data)
-  if j ~= nil and j.content ~= nil then
-    return j.content[1].text
-  else
-    error('Received: ' .. data)
-  end
-end
-
----Returns the text content of an API response.
----Throws an error if the API response cannot be parsed.
----@param data string The response data. Normally a JSON.
----@return string|nil text The API response text, if available.
-local function get_response_text_openai(data)
-  local j = vim.fn.json_decode(data)
-  if j ~= nil and j.choices ~= nil then
-    return j.choices[1].message.content
-  else
-    error('Received: ' .. data)
-  end
-end
-
--- Similarly to responses, the streaminng deltas are modeled differently
--- depending on the API.
-
----Returns event,data
----where
----  event: delta | done | cruft | other
----  data: the delta text (for delta), or the http body for other events.
----@param body string The raw body of the response.
----@return string,string
-local function get_delta_text_openai(body)
-  if body == 'data: [DONE]' then
-    return 'done', body
-  end
-
-  if body == '\n' or body == '' then
-    return 'cruft', body
-  end
-
-  if string.find(body, '^data: ') ~= nil then
-    -- We are in a 'data: ' package now.
-    -- Extract and return the text payload.
-    --
-    -- The last message in an openai delta will have:
-    --   choices[1].delta == {}
-    --   choices[1].finish_reason == 'stop'
-    --
-    local j = vim.fn.json_decode(string.sub(body, 7))
-    if
-      j ~= nil
-      and j.object == 'chat.completion.chunk'
-      and j.choices[1].delta.content ~= nil
-    then
-      return 'delta', j.choices[1].delta.content
-    end
-  else
-    return 'other', body
-  end
-  -- Not data, so most likely metadata that we only would want to see for
-  -- debugging purposes.
-  return 'cruft', body
-end
-
----Returns event,data
----where
----  event: delta | done | cruft | other
----  data: the delta text (for delta), or the http body for other events.
----@param body string The raw body of the response.
----@return string,string
-local function get_delta_text_anthropic(body)
-  if body == 'event: message_stop' then
-    return 'done', body
-  end
-
-  if body == '\n' or body == '' or string.find(body, '^event: ') ~= nil then
-    return 'cruft', body
-  end
-
-  if string.find(body, '^data: ') ~= nil then
-    -- We are in a 'data: ' package now.
-    -- Extract and return the text payload.
-    --
-    local j = vim.fn.json_decode(string.sub(body, 7))
-    if j ~= nil and j.type == 'content_block_delta' and j.delta.text ~= nil then
-      return 'delta', j.delta.text
-    end
-  else
-    return 'other', body
-  end
-  -- Not data, so most likely metadata that we only would want to see for
-  -- debugging purposes.
-  return 'cruft', body
-end
-
 local function get_visual_selection()
   local sline = vim.fn.line 'v'
   local eline = vim.fn.line '.'
@@ -203,17 +100,128 @@ local function get_messages_from_current_buffer()
   return messages
 end
 
-local function get_messages_anthropic()
-  return get_messages_from_current_buffer()
-end
-local function get_messages_openai()
-  local messages = get_messages_from_current_buffer()
-  -- The OpenAI completions API requires the prompt to be
-  -- the first message (with role 'system').
-  -- Patch the messages here.
-  table.insert(messages, 1, { role = 'system', content = M.State.prompt })
-  return messages
-end
+---@class (exact) Anthropic
+---@field get_messages fun():table|nil
+---@field get_response_text fun(string):string|nil
+---@field get_delta_text fun(string):string,string
+local Anthropic = {
+  get_messages = function()
+    return get_messages_from_current_buffer()
+  end,
+  ---Returns the text content of an API response.
+  ---Throws an error if the API response cannot be parsed.
+  ---@param data string The response data. Normally a JSON.
+  ---@return string|nil text The API response text, if available.
+  get_response_text = function(data)
+    local j = vim.fn.json_decode(data)
+    if j ~= nil and j.content ~= nil then
+      return j.content[1].text
+    else
+      error('Received: ' .. data)
+    end
+  end,
+
+  ---Returns event,data
+  ---where
+  ---  event: delta | done | cruft | other
+  ---  data: the delta text (for delta), or the http body for other events.
+  ---@param body string The raw body of the response.
+  ---@return string,string
+  get_delta_text = function(body)
+    if body == 'event: message_stop' then
+      return 'done', body
+    end
+
+    if body == '\n' or body == '' or string.find(body, '^event: ') ~= nil then
+      return 'cruft', body
+    end
+
+    if string.find(body, '^data: ') ~= nil then
+      -- We are in a 'data: ' package now.
+      -- Extract and return the text payload.
+      --
+      local j = vim.fn.json_decode(string.sub(body, 7))
+      if
+        j ~= nil
+        and j.type == 'content_block_delta'
+        and j.delta.text ~= nil
+      then
+        return 'delta', j.delta.text
+      end
+    else
+      return 'other', body
+    end
+    -- Not data, so most likely metadata that we only would want to see for
+    -- debugging purposes.
+    return 'cruft', body
+  end,
+}
+
+---@class (exact) OpenAI
+---@field get_messages fun():table|nil
+---@field get_response_text fun(string):string|nil
+---@field get_delta_text fun(string):string,string
+local OpenAI = {
+  get_messages = function()
+    local messages = get_messages_from_current_buffer()
+    -- The OpenAI completions API requires the prompt to be
+    -- the first message (with role 'system').
+    -- Patch the messages here.
+    table.insert(messages, 1, { role = 'system', content = M.State.prompt })
+    return messages
+  end,
+  ---Returns the text content of an API response.
+  ---Throws an error if the API response cannot be parsed.
+  ---@param data string The response data. Normally a JSON.
+  ---@return string|nil text The API response text, if available.
+  get_response_text = function(data)
+    local j = vim.fn.json_decode(data)
+    if j ~= nil and j.choices ~= nil then
+      return j.choices[1].message.content
+    else
+      error('Received: ' .. data)
+    end
+  end,
+
+  ---Returns event,data
+  ---where
+  ---  event: delta | done | cruft | other
+  ---  data: the delta text (for delta), or the http body for other events.
+  ---@param body string The raw body of the response.
+  ---@return string,string
+  get_delta_text = function(body)
+    if body == 'data: [DONE]' then
+      return 'done', body
+    end
+
+    if body == '\n' or body == '' then
+      return 'cruft', body
+    end
+
+    if string.find(body, '^data: ') ~= nil then
+      -- We are in a 'data: ' package now.
+      -- Extract and return the text payload.
+      --
+      -- The last message in an openai delta will have:
+      --   choices[1].delta == {}
+      --   choices[1].finish_reason == 'stop'
+      --
+      local j = vim.fn.json_decode(string.sub(body, 7))
+      if
+        j ~= nil
+        and j.object == 'chat.completion.chunk'
+        and j.choices[1].delta.content ~= nil
+      then
+        return 'delta', j.choices[1].delta.content
+      end
+    else
+      return 'other', body
+    end
+    -- Not data, so most likely metadata that we only would want to see for
+    -- debugging purposes.
+    return 'cruft', body
+  end,
+}
 
 ---comment
 ---Backend factory.
@@ -320,9 +328,9 @@ end
 ---@return table
 local function make_openai(opts)
   return make_backend(
-    get_delta_text_openai,
-    get_response_text_openai,
-    get_messages_openai,
+    OpenAI.get_delta_text,
+    OpenAI.get_response_text,
+    OpenAI.get_messages,
     opts.url or Config.default_openai_url,
     -- Body
     {
@@ -345,9 +353,9 @@ end
 ---@return table
 local function make_anthropic(opts)
   return make_backend(
-    get_delta_text_anthropic,
-    get_response_text_anthropic,
-    get_messages_anthropic,
+    Anthropic.get_delta_text,
+    Anthropic.get_response_text,
+    Anthropic.get_messages,
     opts.url or Config.default_antrhopic_url,
     -- Body.
     {

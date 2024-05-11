@@ -232,15 +232,19 @@ local function make_backend(
   get_messages,
   url,
   body,
-  headers
+  headers,
+  opts
 )
   return {
+    name = opts.backend_name,
+    opts = opts,
+    type = opts.type,
     run = function()
       local buf_id = vim.api.nvim_get_current_buf()
 
       body.messages = get_messages()
 
-      body.stream = M.get_current_backend_opts().stream or Config.default_stream
+      body.stream = opts.stream or Config.default_stream
 
       local curl_opts = {
         headers = headers,
@@ -330,7 +334,8 @@ local function make_openai(opts)
     {
       content_type = 'application/json',
       authorization = 'Bearer ' .. opts.api_key,
-    }
+    },
+    opts
   )
 end
 
@@ -356,7 +361,8 @@ local function make_anthropic(opts)
       content_type = 'application/json',
       x_api_key = opts.api_key,
       anthropic_version = Config.default_anthropic_version,
-    }
+    },
+    opts
   )
 end
 
@@ -367,23 +373,20 @@ end
 ---@param backend_name string
 ---@return nil
 function M.M0backend(backend_name)
-  if backend_name ~= nil and backend_name ~= '' then
-    Current_backend_name = backend_name
+  local backend_opts = Config.backends[backend_name]
+  if backend_opts == nil then
+    error("Backend '" .. backend_name .. "' not in configuration.")
+  else
   end
-  local backend_type = M.get_current_backend_type()
-  if backend_type == nil then
-    error('Unable to find type for backend: ' .. Current_backend_name)
-  end
-  local opts = M.get_current_backend_opts()
-  if opts == nil then
-    error('Unable to find opts for backend: ' .. Current_backend_name)
+  if backend_opts.type == nil then
+    error('Unable to find type for backend: ' .. backend_name)
   end
   if backend_opts.type == 'anthropic' then
     M.State.backend = make_anthropic(backend_opts)
   elseif backend_opts.type == 'openai' then
     M.State.backend = make_openai(backend_opts)
   else
-    error('Invalid backend type: ' .. backend_type)
+    error('Invalid backend type: ' .. (backend_opts.type or 'nil'))
   end
 end
 
@@ -391,8 +394,8 @@ end
 ---@param prompt_name string
 ---@return nil
 function M.M0prompt(prompt_name)
-  if prompt_name ~= nil and prompt_name ~= '' then
-    Current_prompt_name = prompt_name
+  if Config.prompts[prompt_name] == nil then
+    error("Prompt '" .. prompt_name .. "' not in configuration.")
   end
   M.State.prompt_name = prompt_name
   M.State.prompt = Config.prompts[prompt_name]
@@ -405,25 +408,22 @@ end
 
 function M.setup(user_config)
   Config = vim.tbl_extend('force', Config, user_config or {})
-  Current_backend_name = Config.default_backend_name
-  if Config.backends[Current_backend_name] == nil then
+  if Config.backends[Config.default_backend_name] == nil then
     error(
-      'Current_backend_name ('
-        .. Current_backend_name
-        .. ') set to non-existing configuration.',
-      2
+      'Default backend ('
+        .. Config.default_backend_name
+        .. ') not in configuration.'
     )
   end
-  Current_prompt_name = Config.default_prompt_name
-  if Config.prompts[Current_prompt_name] == nil then
+  if Config.prompts[Config.default_prompt_name] == nil then
     error(
-      'Current_prompt_name ('
-        .. Current_prompt_name
-        .. ') set to non-existing configuration.',
-      2
+      'Default prompt ('
+        .. Config.default_prompt_name
+        .. ') not in configuration.'
     )
   end
-  M.M0backend(Current_backend_name)
+  M.M0prompt(Config.default_prompt_name)
+  M.M0backend(Config.default_backend_name)
 end
 
 -- User commands

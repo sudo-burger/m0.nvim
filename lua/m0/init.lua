@@ -14,34 +14,29 @@ local Config = {
   default_anthropic_version = '2023-06-01',
 }
 
----@class (exact) Backend
----@field run fun(): nil
-local Current_backend = {}
----@type string
-local Current_backend_name = ''
----@type string
-local Current_prompt_name = ''
----@type table
-local API_keys = {}
+---@class (exact) State
+---@field backend Backend
+---@field backend_name string
+---@field prompt string
+---@field prompt_name string
+---@field api_keys table
+M.State = {
+  ---@class (exact) Backend
+  ---@field name string
+  ---@field opts table
+  ---@field type string
+  ---@field run fun(): nil
+  backend = {},
 
--- Util functions
--- --------------
+  ---@type string
+  prompt = '',
 
----comment
----@return string
-function M.get_current_prompt()
-  return Config.prompts[Current_prompt_name]
-end
----comment
----@return table
-function M.get_current_backend_opts()
-  return Config.backends[Current_backend_name]
-end
----comment
----@return string
-function M.get_current_backend_type()
-  return Config.backends[Current_backend_name].type
-end
+  ---@type string
+  prompt_name = '',
+
+  ---@type table
+  api_keys = {},
+}
 
 -- Backend support functions
 -- -------------------------
@@ -49,8 +44,8 @@ end
 
 ---Returns the text content of an API response.
 ---Throws an error if the API response cannot be parsed.
----@param data string The response data (normally a JSON)
----@return string|nil text if available in the API response.
+---@param data string The response data. Normally a JSON.
+---@return string|nil text The API response text, if available.
 local function get_response_text_anthropic(data)
   local j = vim.fn.json_decode(data)
   if j ~= nil and j.content ~= nil then
@@ -62,8 +57,8 @@ end
 
 ---Returns the text content of an API response.
 ---Throws an error if the API response cannot be parsed.
----@param data string The response data (normally a JSON)
----@return string|nil text if available in the API response.
+---@param data string The response data. Normally a JSON.
+---@return string|nil text The API response text, if available.
 local function get_response_text_openai(data)
   local j = vim.fn.json_decode(data)
   if j ~= nil and j.choices ~= nil then
@@ -216,11 +211,7 @@ local function get_messages_openai()
   -- The OpenAI completions API requires the prompt to be
   -- the first message (with role 'system').
   -- Patch the messages here.
-  table.insert(
-    messages,
-    1,
-    { role = 'system', content = M.get_current_prompt() }
-  )
+  table.insert(messages, 1, { role = 'system', content = M.State.prompt })
   return messages
 end
 
@@ -358,7 +349,7 @@ local function make_anthropic(opts)
       model = opts.model,
       temperature = opts.temperature or Config.default_temperature,
       max_tokens = opts.max_tokens or Config.default_max_tokens,
-      system = M.get_current_prompt(),
+      system = M.State.prompt,
     },
     -- Headers.
     {
@@ -387,10 +378,10 @@ function M.M0backend(backend_name)
   if opts == nil then
     error('Unable to find opts for backend: ' .. Current_backend_name)
   end
-  if backend_type == 'anthropic' then
-    Current_backend = make_anthropic(opts)
-  elseif backend_type == 'openai' then
-    Current_backend = make_openai(opts)
+  if backend_opts.type == 'anthropic' then
+    M.State.backend = make_anthropic(backend_opts)
+  elseif backend_opts.type == 'openai' then
+    M.State.backend = make_openai(backend_opts)
   else
     error('Invalid backend type: ' .. backend_type)
   end
@@ -403,11 +394,13 @@ function M.M0prompt(prompt_name)
   if prompt_name ~= nil and prompt_name ~= '' then
     Current_prompt_name = prompt_name
   end
+  M.State.prompt_name = prompt_name
+  M.State.prompt = Config.prompts[prompt_name]
 end
 
 ---Run a chat round.
 function M.M0chat()
-  Current_backend.run()
+  M.State.backend.run()
 end
 
 function M.setup(user_config)
@@ -468,21 +461,21 @@ vim.api.nvim_create_user_command('M0chat', function()
   M.M0chat()
 end, { nargs = 0 })
 
--- Gets a key fron pass.
+---Get a key fron pass.
+---@param name string the name of the key.
+---@return string key the key value.
 function M.get_api_key(name)
-  if API_keys[name] ~= nil then
-    API_keys[name] = vim.fn.system('echo -n $(pass ' .. name .. ')')
+  if M.State.api_keys[name] == nil then
+    M.State.api_keys[name] = vim.fn.system('echo -n $(pass ' .. name .. ')')
   end
-  return API_keys[name]
+  return M.State.api_keys[name]
 end
 
+---Returns various debug information as a string.
+---@return string
 function M.debug()
-  return 'Current backend name: '
-    .. (Current_backend_name or '')
-    .. '\nCurrent backend type: '
-    .. (M.get_current_backend_type() or '')
-    .. '\nCurrent prompt name: '
-    .. (Current_prompt_name or '')
+  return 'State:\n'
+    .. vim.inspect(M.State)
     .. '\nConfiguration: '
     .. vim.inspect(Config)
 end

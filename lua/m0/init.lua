@@ -50,14 +50,34 @@ M.State = {
   api_keys = {},
 }
 
---- Abstract class for message sources.
+--- Abstract class for message handlers.
 ---@class (exact) Message
 ---@field new fun():Message
 ---@field get_messages fun():table
+---@field append_lines fun(table)
+---@field get_last_line fun():string
+---@field set_last_line fun(string)
+---@field open_section fun()
+---@field close_section fun()
 local Message = {}
 Message.new = function()
   local self = {}
   function self.get_messages()
+    error 'abstract method!'
+  end
+  function self.append_lines()
+    error 'abstract method!'
+  end
+  function self.get_last_line()
+    error 'abstract method!'
+  end
+  function self.set_last_line()
+    error 'abstract method!'
+  end
+  function self.open_section()
+    error 'abstract method!'
+  end
+  function self.close_section()
     error 'abstract method!'
   end
   return self
@@ -67,13 +87,13 @@ end
 local CurrentBuffer = {}
 CurrentBuffer.new = function()
   local self = Message.new()
-
+  local buf_id = vim.api.nvim_get_current_buf()
   -- Private method.
   local get_visual_selection = function()
     local sline = vim.fn.line 'v'
     local eline = vim.fn.line '.'
     return vim.api.nvim_buf_get_lines(
-      vim.api.nvim_get_current_buf(),
+      buf_id,
       math.min(sline, eline) - 1,
       math.max(sline, eline),
       false
@@ -85,6 +105,7 @@ CurrentBuffer.new = function()
   -- with format: [{ role = <user|assistant>, content = <str> }]
   --
   self.get_messages = function()
+    buf_id = vim.api.nvim_get_current_buf()
     local messages = {}
     local section_mark = Config.section_mark
     local conversation = nil
@@ -95,8 +116,7 @@ CurrentBuffer.new = function()
       conversation = get_visual_selection()
     else
       -- Read the conversation from the current buffer.
-      conversation =
-        vim.api.nvim_buf_get_lines(vim.api.nvim_get_current_buf(), 0, -1, false)
+      conversation = vim.api.nvim_buf_get_lines(buf_id, 0, -1, false)
     end
 
     -- In conversations, the 'user' and 'assistant' take turns.
@@ -131,6 +151,34 @@ CurrentBuffer.new = function()
     end
     return messages
   end
+
+  self.append_lines = function(lines)
+    vim.api.nvim_buf_set_lines(buf_id, -1, -1, false, lines)
+  end
+
+  self.get_last_line = function()
+    return table.concat(vim.api.nvim_buf_get_lines(buf_id, -2, -1, false))
+  end
+
+  self.set_last_line = function(txt)
+    vim.api.nvim_buf_set_lines(
+      buf_id,
+      -2,
+      -1,
+      false,
+      -- If the input contains multiple lines,
+      -- split them as required by nvim_buf_get_lines()
+      vim.fn.split(txt, '\n', true)
+    )
+  end
+
+  self.open_section = function()
+    self.append_lines { Config.section_mark, '' }
+  end
+
+  self.close_section = function()
+    self.append_lines { Config.section_mark, '' }
+  end
   return self
 end
 
@@ -141,7 +189,7 @@ end
 ---@field opts table
 ---@field get_body fun():table|nil
 ---@field get_headers fun():table|nil
----@field get_messages fun():table|nil
+---@field get_messages fun(table):table|nil
 ---@field get_response_text fun(string):string|nil
 ---@field get_delta_text fun(string):string,string
 local LLMAPI = {}
@@ -196,8 +244,8 @@ Anthropic.new = function(opts)
     }
   end
 
-  self.get_messages = function()
-    return CurrentBuffer.new().get_messages()
+  self.get_messages = function(messages)
+    return messages
   end
   --
   ---Returns the text content of an API response.
@@ -276,8 +324,7 @@ OpenAI.new = function(opts)
     }
   end
 
-  self.get_messages = function()
-    local messages = CurrentBuffer.new().get_messages()
+  self.get_messages = function(messages)
     -- The OpenAI completions API requires the prompt to be
     -- the first message (with role 'system').
     -- Patch the messages here.
@@ -344,47 +391,22 @@ end
 ---Returns a table including the backend-specific implementation of the function run().
 ---
 ---@param API LLMAPI The API handler.
+---@param msg Message The message handler.
 ---@return Backend
-local function make_backend(API, opts)
+local function make_backend(API, msg, opts)
   return {
     opts = opts,
     name = opts.backend_name,
     type = opts.type,
     run = function()
-      local buf_id = vim.api.nvim_get_current_buf()
-
       local body = API.get_body()
       -- Message are specific to each run.
-      body.messages = API.get_messages()
+      body.messages = API.get_messages(msg.get_messages())
 
       local curl_opts = {
         headers = API.get_headers(),
         body = vim.fn.json_encode(body),
       }
-
-      local function append_lines(lines)
-        vim.api.nvim_buf_set_lines(buf_id, -1, -1, false, lines)
-      end
-
-      local function get_last_line()
-        return table.concat(vim.api.nvim_buf_get_lines(buf_id, -2, -1, false))
-      end
-
-      local function set_last_line(txt)
-        vim.api.nvim_buf_set_lines(
-          buf_id,
-          -2,
-          -1,
-          false,
-          -- If the input contains multiple lines,
-          -- split them as required by nvim_buf_get_lines()
-          vim.fn.split(txt, '\n', true)
-        )
-      end
-
-      local function print_section_mark()
-        append_lines { Config.section_mark, '' }
-      end
 
       -- Different callbacks needed, depending on whether streaming is enabled or not.
       if body.stream == true then
@@ -393,12 +415,12 @@ local function make_backend(API, opts)
           local event, d = API.get_delta_text(out)
           if event == 'delta' and d ~= '' then
             -- Add the delta to the current line.
-            set_last_line(get_last_line() .. d)
+            msg.set_last_line(msg.get_last_line() .. d)
           elseif event == 'other' and d ~= '' then
             -- Could be an error.
-            append_lines(vim.fn.split(d, '\n', true))
+            msg.append_lines(vim.fn.split(d, '\n', true))
           elseif event == 'done' then
-            print_section_mark()
+            msg.close_section()
           else
             -- Cruft or no data.
             return
@@ -409,14 +431,13 @@ local function make_backend(API, opts)
         -- We append the LLM's reply to the current buffer at one go.
         curl_opts.callback = vim.schedule_wrap(function(out)
           -- Build and print the reply in the current buffer.
-          set_last_line(API.get_response_text(out.body))
-          print_section_mark()
+          msg.set_last_line(API.get_response_text(out.body))
+          msg.close_section()
         end)
       end
 
-      -- Mark the start of a reply section.
       -- The closing section mark is printed by the curl callbacks.
-      print_section_mark()
+      msg.open_section()
       require('plenary.curl').post(opts.url, curl_opts)
     end,
   }
@@ -430,6 +451,7 @@ end
 ---@return nil
 function M.M0backend(backend_name)
   local API = nil
+  local msg = CurrentBuffer.new()
   local opts = Config.backends[backend_name]
 
   -- Sanity checks.
@@ -455,7 +477,7 @@ function M.M0backend(backend_name)
     error('Invalid backend type: ' .. (opts.type or 'nil'))
   end
 
-  M.State.backend = make_backend(API, opts)
+  M.State.backend = make_backend(API, msg, opts)
 end
 
 ---Select prompt interactively.

@@ -1,5 +1,17 @@
 local M = {}
 
+---@class (exact) Config
+---@field backends table
+---@field default_backend_name string
+---@field prompts table
+---@field default_prompt_name string
+---@field section_mark string
+---@field default_max_tokens integer
+---@field default_temperature float
+---@field default_stream boolean
+---@field default_openai_url string
+---@field default_antrhopic_url string
+---@field default_anthropic_version string
 local Config = {
   backends = {},
   default_backend_name = '',
@@ -170,6 +182,7 @@ Anthropic.new = function(opts)
       model = self.opts.model,
       temperature = self.opts.temperature or Config.default_temperature,
       max_tokens = self.opts.max_tokens or Config.default_max_tokens,
+      stream = opts.stream or Config.default_stream,
       system = M.State.prompt,
     }
   end
@@ -251,6 +264,7 @@ OpenAI.new = function(opts)
       model = self.opts.model,
       temperature = self.opts.temperature or Config.default_temperature,
       max_tokens = self.opts.max_tokens or Config.default_max_tokens,
+      stream = opts.stream or Config.default_stream,
     }
   end
   --
@@ -340,8 +354,8 @@ local function make_backend(API, opts)
       local buf_id = vim.api.nvim_get_current_buf()
 
       local body = API.get_body()
+      -- Message are specific to each run.
       body.messages = API.get_messages()
-      body.stream = opts.stream or Config.default_stream
 
       local curl_opts = {
         headers = API.get_headers(),

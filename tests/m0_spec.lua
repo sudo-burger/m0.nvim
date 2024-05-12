@@ -100,25 +100,6 @@ describe('m0', function()
 end)
 --
 describe('m0', function()
-  it('has an initial prompt', function()
-    assert(M0.State.prompt == Opts.prompts[Opts.default_prompt_name])
-  end)
-end)
-
-describe('m0', function()
-  it('can change the prompt', function()
-    local new_prompt_name = 'Charles Bukowski'
-    local expected = Opts.prompts[new_prompt_name]
-
-    M0.M0prompt(new_prompt_name)
-    assert(
-      expected == M0.State.prompt,
-      'Expected: ' .. expected .. '. Actual: ' .. M0.State.prompt
-    )
-  end)
-end)
-
-describe('m0', function()
   local expected = vim.inspect(Opts.backends[Opts.default_backend_name])
   it('has an initial backend', function()
     assert(
@@ -173,4 +154,42 @@ describe('m0', function()
   it('can chat', function()
     assert.has_no.errors(M0.M0chat)
   end)
+end)
+
+describe('m0', function()
+  it('has an initial prompt', function()
+    assert(M0.State.prompt == Opts.prompts[Opts.default_prompt_name])
+  end)
+end)
+
+describe('m0', function()
+  it(
+    'can change the prompt when the backend is '
+      .. vim.inspect(M0.State.backend.opts.type),
+    function()
+      local new_prompt_name = 'Charles Bukowski'
+      local expected = Opts.prompts[new_prompt_name]
+
+      M0.M0prompt(new_prompt_name)
+      assert(
+        expected == M0.State.prompt,
+        'Expected: ' .. expected .. '. Actual: ' .. M0.State.prompt
+      )
+    end
+  )
+  M0.M0backend 'anthropic:claude-3-haiku'
+  it(
+    'can change the prompt when the backend is '
+      .. vim.inspect(M0.State.backend.opts.type),
+    function()
+      local new_prompt_name = 'Marilyn Monroe'
+      local expected = Opts.prompts[new_prompt_name]
+
+      M0.M0prompt(new_prompt_name)
+      assert(
+        expected == M0.State.prompt,
+        'Expected: ' .. expected .. '. Actual: ' .. M0.State.prompt
+      )
+    end
+  )
 end)

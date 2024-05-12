@@ -38,88 +38,167 @@ M.State = {
   api_keys = {},
 }
 
-local function get_visual_selection()
-  local sline = vim.fn.line 'v'
-  local eline = vim.fn.line '.'
-  return vim.api.nvim_buf_get_lines(
-    vim.api.nvim_get_current_buf(),
-    math.min(sline, eline) - 1,
-    math.max(sline, eline),
-    false
-  )
+--- Abstract class for message sources.
+---@class (exact) Message
+---@field new fun():Message
+---@field get_messages fun():table
+local Message = {}
+Message.new = function()
+  local self = {}
+  function self.get_messages()
+    error 'abstract method!'
+  end
+  return self
 end
 
--- Transform the chat text into a list of 'messages',
--- with format: [{ role = <user|assistant>, content = <str> }]
---
-local function get_messages_from_current_buffer()
-  local messages = {}
-  local section_mark = Config.section_mark
-  local conversation = nil
+--- Extends Message.
+local CurrentBuffer = {}
+CurrentBuffer.new = function()
+  local self = Message.new()
 
-  local mode = vim.api.nvim_get_mode().mode
-  if mode == 'v' or mode == 'V' then
-    -- Read the conversation from the visual selection.
-    conversation = get_visual_selection()
-  else
-    -- Read the conversation from the current buffer.
-    conversation =
-      vim.api.nvim_buf_get_lines(vim.api.nvim_get_current_buf(), 0, -1, false)
+  -- Private method.
+  local get_visual_selection = function()
+    local sline = vim.fn.line 'v'
+    local eline = vim.fn.line '.'
+    return vim.api.nvim_buf_get_lines(
+      vim.api.nvim_get_current_buf(),
+      math.min(sline, eline) - 1,
+      math.max(sline, eline),
+      false
+    )
   end
 
-  -- In conversations, the 'user' and 'assistant' take turns.
-  -- "Section marks" are used to signal the switches between the two roles.
-  local i = 1
-  local role = {
-    'user',
-    'assistant',
-  }
-  -- Assume the first message to be the user's.
-  local role_idx = 1
-  while i <= #conversation do
-    -- Switch between roles when meeting a section mark in the conversation.
-    if conversation[i] == section_mark then
-      -- Switch role.
-      if role_idx == 1 then
-        role_idx = 2
-      else
-        role_idx = 1
+  -- Get messages from current buffer.
+  -- Transform the chat text into a list of 'messages',
+  -- with format: [{ role = <user|assistant>, content = <str> }]
+  --
+  self.get_messages = function()
+    local messages = {}
+    local section_mark = Config.section_mark
+    local conversation = nil
+
+    local mode = vim.api.nvim_get_mode().mode
+    if mode == 'v' or mode == 'V' then
+      -- Read the conversation from the visual selection.
+      conversation = get_visual_selection()
+    else
+      -- Read the conversation from the current buffer.
+      conversation =
+        vim.api.nvim_buf_get_lines(vim.api.nvim_get_current_buf(), 0, -1, false)
+    end
+
+    -- In conversations, the 'user' and 'assistant' take turns.
+    -- "Section marks" are used to signal the switches between the two roles.
+    local i = 1
+    local role = {
+      'user',
+      'assistant',
+    }
+    -- Assume the first message to be the user's.
+    local role_idx = 1
+    while i <= #conversation do
+      -- Switch between roles when meeting a section mark in the conversation.
+      if conversation[i] == section_mark then
+        -- Switch role.
+        if role_idx == 1 then
+          role_idx = 2
+        else
+          role_idx = 1
+        end
+        i = i + 1
       end
-      i = i + 1
-    end
 
-    -- Build a message.
-    local message = { role = role[role_idx], content = '' }
-    while i <= #conversation and conversation[i] ~= section_mark do
-      message.content = message.content .. conversation[i] .. '\n'
-      i = i + 1
-    end
+      -- Build a message.
+      local message = { role = role[role_idx], content = '' }
+      while i <= #conversation and conversation[i] ~= section_mark do
+        message.content = message.content .. conversation[i] .. '\n'
+        i = i + 1
+      end
 
-    table.insert(messages, message)
+      table.insert(messages, message)
+    end
+    return messages
   end
-  return messages
+  return self
 end
 
----@class (exact) Anthropic
+---Abstract class for LLM APIs.
+--
+---@class (exact) LLMAPI
+---@field new fun():LLMAPI
+---@field opts table
+---@field get_body fun():table|nil
+---@field get_headers fun():table|nil
 ---@field get_messages fun():table|nil
 ---@field get_response_text fun(string):string|nil
 ---@field get_delta_text fun(string):string,string
-local Anthropic = {
-  get_messages = function()
-    return get_messages_from_current_buffer()
-  end,
+local LLMAPI = {}
+function LLMAPI.new()
+  local self = {}
+  self.opts = {}
+  function self.get_body()
+    error 'abstract method!'
+  end
+  function self.get_headers()
+    error 'abstract method!'
+  end
+  function self.get_messages()
+    error 'abstract method!'
+  end
+  function self.get_response_text()
+    error 'abstract method!'
+  end
+  function self.get_delta_text()
+    error 'abstract method!'
+  end
+  return self
+end
+--
+
+-- Extends LLMAPI
+---@class (exact) Anthropic
+---@field new fun(table):LLMAPI
+---@field opts table
+local Anthropic = {}
+Anthropic.new = function(opts)
+  local self = LLMAPI.new()
+  self.opts = opts
+
+  ---@return table
+  self.get_body = function()
+    return {
+      model = self.opts.model,
+      temperature = self.opts.temperature or Config.default_temperature,
+      max_tokens = self.opts.max_tokens or Config.default_max_tokens,
+      system = M.State.prompt,
+    }
+  end
+  --
+  ---@return table
+  self.get_headers = function()
+    return {
+      content_type = 'application/json',
+      x_api_key = self.opts.api_key,
+      anthropic_version = Config.default_anthropic_version,
+    }
+  end
+
+  self.get_messages = function()
+    return CurrentBuffer.new().get_messages()
+  end
+  --
   ---Returns the text content of an API response.
   ---Throws an error if the API response cannot be parsed.
   ---@param data string The response data. Normally a JSON.
   ---@return string|nil text The API response text, if available.
-  get_response_text = function(data)
+  self.get_response_text = function(data)
     local j = vim.fn.json_decode(data)
     if j ~= nil and j.content ~= nil then
       return j.content[1].text
     else
       error('Received: ' .. data)
     end
-  end,
+  end
 
   ---Returns event,data
   ---where
@@ -127,7 +206,7 @@ local Anthropic = {
   ---  data: the delta text (for delta), or the http body for other events.
   ---@param body string The raw body of the response.
   ---@return string,string
-  get_delta_text = function(body)
+  self.get_delta_text = function(body)
     if body == 'event: message_stop' then
       return 'done', body
     end
@@ -154,34 +233,56 @@ local Anthropic = {
     -- Not data, so most likely metadata that we only would want to see for
     -- debugging purposes.
     return 'cruft', body
-  end,
-}
+  end
+  return self
+end
 
+-- Extends LLMAPI
 ---@class (exact) OpenAI
----@field get_messages fun():table|nil
----@field get_response_text fun(string):string|nil
----@field get_delta_text fun(string):string,string
-local OpenAI = {
-  get_messages = function()
-    local messages = get_messages_from_current_buffer()
+---@field new fun(table):LLMAPI
+---@field opts table
+local OpenAI = {}
+OpenAI.new = function(opts)
+  local self = LLMAPI.new()
+  self.opts = opts
+  ---@return table
+  self.get_body = function()
+    return {
+      model = self.opts.model,
+      temperature = self.opts.temperature or Config.default_temperature,
+      max_tokens = self.opts.max_tokens or Config.default_max_tokens,
+    }
+  end
+  --
+  ---@return table
+  self.get_headers = function()
+    return {
+      content_type = 'application/json',
+      authorization = 'Bearer ' .. self.opts.api_key,
+    }
+  end
+
+  self.get_messages = function()
+    local messages = CurrentBuffer.new().get_messages()
     -- The OpenAI completions API requires the prompt to be
     -- the first message (with role 'system').
     -- Patch the messages here.
     table.insert(messages, 1, { role = 'system', content = M.State.prompt })
     return messages
-  end,
+  end
+
   ---Returns the text content of an API response.
   ---Throws an error if the API response cannot be parsed.
   ---@param data string The response data. Normally a JSON.
   ---@return string|nil text The API response text, if available.
-  get_response_text = function(data)
+  self.get_response_text = function(data)
     local j = vim.fn.json_decode(data)
     if j ~= nil and j.choices ~= nil then
       return j.choices[1].message.content
     else
       error('Received: ' .. data)
     end
-  end,
+  end
 
   ---Returns event,data
   ---where
@@ -189,7 +290,7 @@ local OpenAI = {
   ---  data: the delta text (for delta), or the http body for other events.
   ---@param body string The raw body of the response.
   ---@return string,string
-  get_delta_text = function(body)
+  self.get_delta_text = function(body)
     if body == 'data: [DONE]' then
       return 'done', body
     end
@@ -220,42 +321,30 @@ local OpenAI = {
     -- Not data, so most likely metadata that we only would want to see for
     -- debugging purposes.
     return 'cruft', body
-  end,
-}
+  end
+  return self
+end
 
 ---comment
 ---Backend factory.
 ---Returns a table including the backend-specific implementation of the function run().
 ---
----@param get_delta_text fun(string):table<string,string> A function to return an API response delta if streaminng.
----@param get_response_text fun(table):string A function to return an API response if not streaming.
----@param get_messages fun():table A function to extract messages from the current conversation.
----@param url string API url.
----@param body table API-specific request body.
----@param headers table API-specific headers.
+---@param API LLMAPI The API handler.
 ---@return Backend
-local function make_backend(
-  get_delta_text,
-  get_response_text,
-  get_messages,
-  url,
-  body,
-  headers,
-  opts
-)
+local function make_backend(API, opts)
   return {
-    name = opts.backend_name,
     opts = opts,
+    name = opts.backend_name,
     type = opts.type,
     run = function()
       local buf_id = vim.api.nvim_get_current_buf()
 
-      body.messages = get_messages()
-
+      local body = API.get_body()
+      body.messages = API.get_messages()
       body.stream = opts.stream or Config.default_stream
 
       local curl_opts = {
-        headers = headers,
+        headers = API.get_headers(),
         body = vim.fn.json_encode(body),
       }
 
@@ -287,7 +376,7 @@ local function make_backend(
       if body.stream == true then
         -- The streaming callback appends the reply to the current buffer.
         curl_opts.stream = vim.schedule_wrap(function(_, out, _)
-          local event, d = get_delta_text(out)
+          local event, d = API.get_delta_text(out)
           if event == 'delta' and d ~= '' then
             -- Add the delta to the current line.
             set_last_line(get_last_line() .. d)
@@ -306,7 +395,7 @@ local function make_backend(
         -- We append the LLM's reply to the current buffer at one go.
         curl_opts.callback = vim.schedule_wrap(function(out)
           -- Build and print the reply in the current buffer.
-          set_last_line(get_response_text(out.body))
+          set_last_line(API.get_response_text(out.body))
           print_section_mark()
         end)
       end
@@ -314,64 +403,9 @@ local function make_backend(
       -- Mark the start of a reply section.
       -- The closing section mark is printed by the curl callbacks.
       print_section_mark()
-      require('plenary.curl').post(url, curl_opts)
+      require('plenary.curl').post(opts.url, curl_opts)
     end,
   }
-end
-
--- Backend constuctors
--- -------------------
-
----Make an OpenAI backend.
----Returns a table that includes the run() function.
----@param opts table Backend opts. Normally from the user configuration.
----@return table
-local function make_openai(opts)
-  return make_backend(
-    OpenAI.get_delta_text,
-    OpenAI.get_response_text,
-    OpenAI.get_messages,
-    opts.url or Config.default_openai_url,
-    -- Body
-    {
-      model = opts.model,
-      temperature = opts.temperature or Config.default_temperature,
-      max_tokens = opts.max_tokens or Config.default_max_tokens,
-    },
-    -- Headers.
-    {
-      content_type = 'application/json',
-      authorization = 'Bearer ' .. opts.api_key,
-    },
-    opts
-  )
-end
-
----Make an Anthropic backend.
----Returns a table that includes the run() function.
----@param opts table Backend opts. Normally from the user configuration.
----@return table
-local function make_anthropic(opts)
-  return make_backend(
-    Anthropic.get_delta_text,
-    Anthropic.get_response_text,
-    Anthropic.get_messages,
-    opts.url or Config.default_antrhopic_url,
-    -- Body.
-    {
-      model = opts.model,
-      temperature = opts.temperature or Config.default_temperature,
-      max_tokens = opts.max_tokens or Config.default_max_tokens,
-      system = M.State.prompt,
-    },
-    -- Headers.
-    {
-      content_type = 'application/json',
-      x_api_key = opts.api_key,
-      anthropic_version = Config.default_anthropic_version,
-    },
-    opts
-  )
 end
 
 -- Exported functions
@@ -381,21 +415,33 @@ end
 ---@param backend_name string
 ---@return nil
 function M.M0backend(backend_name)
-  local backend_opts = Config.backends[backend_name]
-  if backend_opts == nil then
+  local API = nil
+  local opts = Config.backends[backend_name]
+
+  -- Sanity checks.
+  if opts == nil then
     error("Backend '" .. backend_name .. "' not in configuration.")
-  else
   end
-  if backend_opts.type == nil then
+  if opts.type == nil then
     error('Unable to find type for backend: ' .. backend_name)
   end
-  if backend_opts.type == 'anthropic' then
-    M.State.backend = make_anthropic(backend_opts)
-  elseif backend_opts.type == 'openai' then
-    M.State.backend = make_openai(backend_opts)
+
+  -- Backend type handlers.
+  if opts.type == 'anthropic' then
+    if opts.url == nil then
+      opts.url = Config.default_antrhopic_url
+    end
+    API = Anthropic.new(opts)
+  elseif opts.type == 'openai' then
+    if opts.url == nil then
+      opts.url = Config.default_openai_url
+    end
+    API = OpenAI.new(opts)
   else
-    error('Invalid backend type: ' .. (backend_opts.type or 'nil'))
+    error('Invalid backend type: ' .. (opts.type or 'nil'))
   end
+
+  M.State.backend = make_backend(API, opts)
 end
 
 ---Select prompt interactively.

@@ -88,7 +88,10 @@ local CurrentBuffer = {}
 CurrentBuffer.new = function()
   local self = Message.new()
   local buf_id = vim.api.nvim_get_current_buf()
-  -- Private method.
+  -- Private methods.
+
+  --- Get the currently selected text.
+  ---@return table selected An array of lines, or {}.
   local get_visual_selection = function()
     local sline = vim.fn.line 'v'
     local eline = vim.fn.line '.'
@@ -99,6 +102,8 @@ CurrentBuffer.new = function()
       false
     )
   end
+
+  -- Public methods.
 
   -- Get messages from current buffer.
   -- Transform the chat text into a list of 'messages',

@@ -110,6 +110,7 @@ CurrentBuffer.new = function()
   -- with format: [{ role = <user|assistant>, content = <str> }]
   --
   self.get_messages = function()
+    buf_id = vim.api.nvim_get_current_buf()
     local messages = {}
     local section_mark = Config.section_mark
     local conversation = nil

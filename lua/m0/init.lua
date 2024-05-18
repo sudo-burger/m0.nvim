@@ -431,7 +431,7 @@ local function make_backend(API, msg, opts)
         -- Not streaming.
         -- We append the LLM's reply to the current buffer at one go.
         curl_opts.callback = vim.schedule_wrap(function(out)
-          -- Build and print the reply in the current buffer.
+          -- Build the reply in the message handler.
           msg.set_last_line(API.get_response_text(out.body))
           msg.close_section()
         end)

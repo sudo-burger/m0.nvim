@@ -2,28 +2,28 @@ local M = {}
 
 ---@class (exact) Config
 ---@field backends table
----@field default_backend_name string
----@field prompts table
----@field default_prompt_name string
----@field section_mark string
----@field default_max_tokens integer
----@field default_temperature float
----@field default_stream boolean
----@field default_openai_url string
----@field default_antrhopic_url string
 ---@field default_anthropic_version string
+---@field default_antrhopic_url string
+---@field default_backend_name string
+---@field default_max_tokens integer
+---@field default_openai_url string
+---@field default_prompt_name string
+---@field default_stream boolean
+---@field default_temperature float
+---@field prompts table
+---@field section_mark string
 local Config = {
   backends = {},
-  default_backend_name = '',
-  prompts = {},
-  default_prompt_name = '',
-  section_mark = '-------',
-  default_max_tokens = 128,
-  default_temperature = 1,
-  default_stream = false,
-  default_openai_url = 'https://api.openai.com/v1/chat/completions',
-  default_antrhopic_url = 'https://api.anthropic.com/v1/messages',
   default_anthropic_version = '2023-06-01',
+  default_antrhopic_url = 'https://api.anthropic.com/v1/messages',
+  default_backend_name = '',
+  default_max_tokens = 128,
+  default_openai_url = 'https://api.openai.com/v1/chat/completions',
+  default_prompt_name = '',
+  default_stream = false,
+  default_temperature = 1,
+  prompts = {},
+  section_mark = '-------',
 }
 
 ---@class (exact) State
@@ -192,10 +192,30 @@ end
 ---@class (exact) LLMAPI
 ---@field new fun():LLMAPI
 ---@field opts table
----@field get_body fun():table|nil
----@field get_headers fun():table|nil
----@field get_messages fun(table):table|nil
+--- Get the API request body.
+---@return table
+---@field get_body fun():table
+--- Get the API request headers.
+---@return table
+---@field get_headers fun():table
+---Get the chat messages.
+---@field get_messages fun(messages :table):table|nil
+---Returns the text content of an API response.
+---Throws an error if the API response cannot be parsed.
+---@param data string The response data. Normally a JSON.
+---@return string|nil text The API response text, if available.
 ---@field get_response_text fun(string):string|nil
+---Returns event,data
+---where
+---  event:
+---  - delta: the server sent a text delta
+---  - cruft: the server sent data we consider to be cruft
+---  - done: the server signalled that the text transfer is done.
+---  - other: we received something we cannot interpret.
+---  data: the delta text (for delta events), or the http body for other events.
+---@async
+---@param body string The raw body of the response.
+---@return string,string
 ---@field get_delta_text fun(string):string,string
 local LLMAPI = {}
 function LLMAPI.new()
@@ -229,7 +249,6 @@ Anthropic.new = function(opts)
   local self = LLMAPI.new()
   self.opts = opts
 
-  ---@return table
   self.get_body = function()
     return {
       model = self.opts.model,
@@ -239,8 +258,7 @@ Anthropic.new = function(opts)
       system = M.State.prompt,
     }
   end
-  --
-  ---@return table
+
   self.get_headers = function()
     return {
       content_type = 'application/json',
@@ -252,11 +270,7 @@ Anthropic.new = function(opts)
   self.get_messages = function(messages)
     return messages
   end
-  --
-  ---Returns the text content of an API response.
-  ---Throws an error if the API response cannot be parsed.
-  ---@param data string The response data. Normally a JSON.
-  ---@return string|nil text The API response text, if available.
+
   self.get_response_text = function(data)
     local j = vim.fn.json_decode(data)
     if j ~= nil and j.content ~= nil then
@@ -266,12 +280,6 @@ Anthropic.new = function(opts)
     end
   end
 
-  ---Returns event,data
-  ---where
-  ---  event: delta | done | cruft | other
-  ---  data: the delta text (for delta), or the http body for other events.
-  ---@param body string The raw body of the response.
-  ---@return string,string
   self.get_delta_text = function(body)
     if body == 'event: message_stop' then
       return 'done', body
@@ -311,7 +319,7 @@ local OpenAI = {}
 OpenAI.new = function(opts)
   local self = LLMAPI.new()
   self.opts = opts
-  ---@return table
+
   self.get_body = function()
     return {
       model = self.opts.model,
@@ -320,8 +328,7 @@ OpenAI.new = function(opts)
       stream = opts.stream or Config.default_stream,
     }
   end
-  --
-  ---@return table
+
   self.get_headers = function()
     return {
       content_type = 'application/json',
@@ -337,10 +344,6 @@ OpenAI.new = function(opts)
     return messages
   end
 
-  ---Returns the text content of an API response.
-  ---Throws an error if the API response cannot be parsed.
-  ---@param data string The response data. Normally a JSON.
-  ---@return string|nil text The API response text, if available.
   self.get_response_text = function(data)
     local j = vim.fn.json_decode(data)
     if j ~= nil and j.choices ~= nil then
@@ -350,12 +353,6 @@ OpenAI.new = function(opts)
     end
   end
 
-  ---Returns event,data
-  ---where
-  ---  event: delta | done | cruft | other
-  ---  data: the delta text (for delta), or the http body for other events.
-  ---@param body string The raw body of the response.
-  ---@return string,string
   self.get_delta_text = function(body)
     if body == 'data: [DONE]' then
       return 'done', body
@@ -391,7 +388,6 @@ OpenAI.new = function(opts)
   return self
 end
 
----comment
 ---Backend factory.
 ---Returns a table including the backend-specific implementation of the function run().
 ---

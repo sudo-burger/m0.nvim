@@ -9,7 +9,7 @@ local M = {}
 ---@field default_openai_url string
 ---@field default_prompt_name string
 ---@field default_stream boolean
----@field default_temperature float
+---@field default_temperature number
 ---@field prompts table
 ---@field section_mark string
 local Config = {
@@ -21,7 +21,7 @@ local Config = {
   default_openai_url = 'https://api.openai.com/v1/chat/completions',
   default_prompt_name = '',
   default_stream = false,
-  default_temperature = 1,
+  default_temperature = 1.0,
   prompts = {},
   section_mark = '-------',
 }

@@ -10,7 +10,7 @@ local M = {}
 ---@class Config
 ---@field backends table<Backend>
 ---@field default_anthropic_version string
----@field default_antrhopic_url string
+---@field default_anthropic_url string
 ---@field default_backend_name string
 ---@field default_max_tokens integer
 ---@field default_openai_url string
@@ -31,7 +31,7 @@ local M = {}
 local Config = {
   backends = {},
   default_anthropic_version = '2023-06-01',
-  default_antrhopic_url = 'https://api.anthropic.com/v1/messages',
+  default_anthropic_url = 'https://api.anthropic.com/v1/messages',
   default_backend_name = '',
   default_max_tokens = 128,
   default_openai_url = 'https://api.openai.com/v1/chat/completions',
@@ -450,7 +450,7 @@ function M.M0backend(backend_name)
   -- Backend type handlers.
   if opts.type == 'anthropic' then
     if opts.url == nil then
-      opts.url = Config.default_antrhopic_url
+      opts.url = Config.default_anthropic_url
     end
     API = Anthropic:new(opts)
   elseif opts.type == 'openai' then

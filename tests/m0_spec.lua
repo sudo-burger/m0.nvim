@@ -5,7 +5,7 @@ M0 = require 'm0'
 Opts = {
   backends = {
     ['openai:gpt-3.5-turbo'] = {
-      type = 'openai',
+      api_type = 'openai',
       api_key = 'xxx',
       model = 'gpt-3.5-turbo',
       stream = true,
@@ -30,7 +30,7 @@ end)
 Opts = {
   backends = {
     ['openai:gpt-3.5-turbo'] = {
-      type = 'openai',
+      api_type = 'openai',
       api_key = 'xxx',
       model = 'gpt-3.5-turbo',
       stream = true,
@@ -55,19 +55,19 @@ end)
 Opts = {
   backends = {
     ['openai:gpt-3.5-turbo'] = {
-      type = 'openai',
+      api_type = 'openai',
       api_key = 'xxx',
       model = 'gpt-3.5-turbo',
       stream = true,
     },
     ['anthropic:claude-3-haiku'] = {
-      type = 'anthropic',
+      api_type = 'anthropic',
       api_key = 'xxx',
       anthropic_version = '2023-06-01',
       model = 'claude-3-haiku-20240307',
     },
     ['mistral:mistral-large-latest'] = {
-      type = 'openai',
+      api_type = 'openai',
       url = 'https://api.mistral.ai/v1/chat/completions',
       api_key = 'xxx',
       model = 'mistral-large-latest',

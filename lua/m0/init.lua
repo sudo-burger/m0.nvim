@@ -1,11 +1,19 @@
-local M = {}
+---@alias api_type
+---| '"anthropic"'
+---| '"openai"'
+
+---@alias delta_event
+---| '"delta"' # the server sent a text delta
+---| '"cruft"' # the server sent data we consider to be cruft
+---| '"done"' # the server signalled that the text transfer is done.
+---| '"other"' # we received something we cannot interpret.
 
 ---Abstracts backend.
 ---@class Backend
----@field name? string
----@field opts? table
----@field type? string
----@field run? fun(): nil
+---@field name string
+---@field opts table
+---@field api_type api_type The backend API type.
+---@field run fun(): nil
 
 ---@class Config
 ---@field backends table<Backend>
@@ -27,7 +35,34 @@ local M = {}
 ---@field prompt_name? string
 ---@field api_keys? table
 
----@type Config
+-- Abstract class for message handlers.
+---@class Message
+---@field get_messages fun():table
+---@field append_lines fun()
+---@field get_last_line fun():string
+---@field set_last_line fun(string)
+---@field open_section fun()
+---@field close_section fun()
+
+---Abstract class for LLM APIs.
+---@class LLMAPI
+---@field opts table The API configuration.
+---@field get_body fun():table Get the API request body.
+---@field get_headers fun():table Get the API request headers.
+---@field get_messages fun(messages:table):table? get the chat messages.
+---@field get_response_text fun(data:string):string? Returns the text content of an API response.
+---Returns delta_event,data
+---where
+---  data: the delta text (for delta_event "delta"), or the http body for other events.
+---@async
+---@field get_delta_text? fun(LLMAPI:LLMAPI, body:string):delta_event,string
+
+local M = {
+  ---@class State
+  State = {},
+}
+
+---@class Config
 local Config = {
   backends = {},
   default_anthropic_version = '2023-06-01',
@@ -42,57 +77,24 @@ local Config = {
   section_mark = '-------',
 }
 
----@type State
-M.State = {}
-
--- Abstract class for message handlers.
 ---@class Message
----@field get_messages fun():table
----@field append_lines fun()
----@field get_last_line fun():string
----@field set_last_line fun(string)
----@field open_section fun()
----@field close_section fun()
 Message = {}
 Message.__index = Message
----@diagnostic disable-next-line: duplicate-set-field
-function Message.get_messages()
-  error 'abstract method!'
-end
----@diagnostic disable-next-line: duplicate-set-field
-function Message.append_lines()
-  error 'abstract method!'
-end
----@diagnostic disable-next-line: duplicate-set-field
-function Message.get_last_line()
-  error 'abstract method!'
-end
----@diagnostic disable-next-line: duplicate-set-field
-function Message.set_last_line(_)
-  error 'abstract method!'
-end
----@diagnostic disable-next-line: duplicate-set-field
-function Message.open_section()
-  error 'abstract method!'
-end
----@diagnostic disable-next-line: duplicate-set-field
-function Message.close_section()
-  error 'abstract method!'
-end
 
 ---@class CurrentBuffer:Message
----@field new fun(Message):Message
+---@field opts Config
+---@field new fun(self:Message, opts:Config):Message
 local CurrentBuffer = {}
 
-function CurrentBuffer:new()
+function CurrentBuffer:new(opts)
   return setmetatable(
-    { buf_id = vim.api.nvim_get_current_buf() },
+    { buf_id = vim.api.nvim_get_current_buf(), opts = opts },
     { __index = setmetatable(CurrentBuffer, { __index = Message }) }
   )
 end
 
---- Get the currently selected text.
----@return table selected An array of lines, or {}.
+---Get the currently selected text.
+---@return table selected An array of lines.
 function CurrentBuffer:get_visual_selection()
   local sline = vim.fn.line 'v'
   local eline = vim.fn.line '.'
@@ -104,12 +106,10 @@ function CurrentBuffer:get_visual_selection()
   )
 end
 
--- Public methods.
-
--- Get messages from current buffer.
--- Transform the chat text into a list of 'messages',
--- with format: [{ role = <user|assistant>, content = <str> }]
---
+--- Get messages from current buffer.
+--- Transform the chat text into a list of 'messages',
+--- with format: [{ role = <user|assistant>, content = <str> }]
+---@return table messages
 function CurrentBuffer:get_messages()
   self.buf_id = vim.api.nvim_get_current_buf()
   local messages = {}
@@ -179,54 +179,16 @@ function CurrentBuffer:set_last_line(txt)
 end
 
 function CurrentBuffer:open_section()
-  self:append_lines { Config.section_mark, '' }
+  self:append_lines { self.opts.section_mark, '' }
 end
 
 function CurrentBuffer:close_section()
-  self:append_lines { Config.section_mark, '' }
+  self:append_lines { self.opts.section_mark, '' }
 end
 
----Abstract class for LLM APIs.
---
 ---@class LLMAPI
----@field opts table
----@field get_body fun():table Get the API request body.
----@field get_headers fun():table Get the API request headers.
----@field get_messages fun(messages:table):table|nil get the chat messages.
----Returns the text content of an API response.
----Throws an error if the API response cannot be parsed.
----@param data string The response data. Normally a JSON.
----@return string|nil The API response text, if available.
----@field get_response_text fun(data:string):string|nil
----Returns event,data
----where
----  event:
----  - delta: the server sent a text delta
----  - cruft: the server sent data we consider to be cruft
----  - done: the server signalled that the text transfer is done.
----  - other: we received something we cannot interpret.
----  data: the delta text (for delta events), or the http body for other events.
----@async
----@param body string The raw body of the response.
----@return string,string
----@field get_delta_text fun(LLMAPI, string):string,string
-local LLMAPI = {}
+LLMAPI = {}
 LLMAPI.__index = LLMAPI
-function LLMAPI.get_body()
-  error 'abstract method!'
-end
-function LLMAPI.get_headers()
-  error 'abstract method!'
-end
-function LLMAPI.get_messages(_)
-  error 'abstract method!'
-end
-function LLMAPI.get_response_text(_)
-  error 'abstract method!'
-end
-function LLMAPI.get_delta_text(_)
-  error 'abstract method!'
-end
 
 ---@class Anthropic:LLMAPI
 ---@field new fun(LLMAPI, table):LLMAPI
@@ -382,7 +344,6 @@ local function make_backend(API, msg, opts)
   return {
     opts = opts,
     name = opts.backend_name,
-    type = opts.type,
     run = function()
       local body = API:get_body()
       -- Message are specific to each run.
@@ -432,34 +393,34 @@ end
 -- ------------------
 
 ---Select backend interactively.
----@param backend_name string
+---@param backend_name string The name of the backend, as found in the user configuration.
 ---@return nil
 function M.M0backend(backend_name)
   local API = nil
-  local msg = CurrentBuffer:new()
+  local msg = CurrentBuffer:new(Config)
   local opts = Config.backends[backend_name]
 
   -- Sanity checks.
   if opts == nil then
     error("Backend '" .. backend_name .. "' not in configuration.")
   end
-  if opts.type == nil then
-    error('Unable to find type for backend: ' .. backend_name)
+  if opts.api_type == nil then
+    error('Unable to find API type for backend: ' .. backend_name)
   end
 
   -- Backend type handlers.
-  if opts.type == 'anthropic' then
+  if opts.api_type == 'anthropic' then
     if opts.url == nil then
       opts.url = Config.default_anthropic_url
     end
     API = Anthropic:new(opts)
-  elseif opts.type == 'openai' then
+  elseif opts.api_type == 'openai' then
     if opts.url == nil then
       opts.url = Config.default_openai_url
     end
     API = OpenAI:new(opts)
   else
-    error('Invalid backend type: ' .. (opts.type or 'nil'))
+    error('Invalid backend API type: ' .. (opts.api_type or 'nil'))
   end
 
   M.State.backend = make_backend(API, msg, opts)
@@ -501,51 +462,51 @@ function M.setup(user_config)
   end
   M.M0prompt(Config.default_prompt_name)
   M.M0backend(Config.default_backend_name)
-end
 
--- User commands
--- -------------
+  -- User commands
+  -- -------------
 
-vim.api.nvim_create_user_command('M0prompt', function(opts)
-  M.M0prompt(opts.args)
-end, {
-  nargs = 1,
-  complete = function()
-    local ret = {}
-    for k, _ in pairs(Config.prompts) do
-      table.insert(ret, k)
+  vim.api.nvim_create_user_command('M0prompt', function(opts)
+    M.M0prompt(opts.args)
+  end, {
+    nargs = 1,
+    complete = function()
+      local ret = {}
+      for k, _ in pairs(Config.prompts) do
+        table.insert(ret, k)
+      end
+      table.sort(ret)
+      return ret
+    end,
+  })
+
+  vim.api.nvim_create_user_command('M0backend', function(opts)
+    M.M0backend(opts.args)
+  end, {
+    nargs = 1,
+    complete = function()
+      local ret = {}
+      for k, _ in pairs(Config.backends) do
+        table.insert(ret, k)
+      end
+      table.sort(ret)
+      return ret
+    end,
+  })
+
+  vim.api.nvim_create_user_command('M0chat', function()
+    M.M0chat()
+  end, { nargs = 0 })
+
+  ---Get a key fron pass.
+  ---@param name string the name of the key.
+  ---@return string key the key value.
+  function M.get_api_key(name)
+    if M.State.api_keys[name] == nil then
+      M.State.api_keys[name] = vim.fn.system('echo -n $(pass ' .. name .. ')')
     end
-    table.sort(ret)
-    return ret
-  end,
-})
-
-vim.api.nvim_create_user_command('M0backend', function(opts)
-  M.M0backend(opts.args)
-end, {
-  nargs = 1,
-  complete = function()
-    local ret = {}
-    for k, _ in pairs(Config.backends) do
-      table.insert(ret, k)
-    end
-    table.sort(ret)
-    return ret
-  end,
-})
-
-vim.api.nvim_create_user_command('M0chat', function()
-  M.M0chat()
-end, { nargs = 0 })
-
----Get a key fron pass.
----@param name string the name of the key.
----@return string key the key value.
-function M.get_api_key(name)
-  if M.State.api_keys[name] == nil then
-    M.State.api_keys[name] = vim.fn.system('echo -n $(pass ' .. name .. ')')
+    return M.State.api_keys[name]
   end
-  return M.State.api_keys[name]
 end
 
 ---Returns various debug information as a string.

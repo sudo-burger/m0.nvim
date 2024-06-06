@@ -508,11 +508,12 @@ function M.setup(user_config)
   ---Get a key fron pass.
   ---@param name string the name of the key.
   ---@return string key the key value.
-  function M.get_api_key(name)
-    if M.State.api_keys[name] == nil then
-      M.State.api_keys[name] = vim.fn.system('echo -n $(pass ' .. name .. ')')
+  function M:get_api_key(name)
+    if self.State.api_keys[name] == nil then
+      self.State.api_keys[name] =
+        vim.fn.system('echo -n $(pass ' .. name .. ')')
     end
-    return M.State.api_keys[name]
+    return self.State.api_keys[name]
   end
 end
 

@@ -83,9 +83,11 @@ Message.__index = Message
 
 ---@class CurrentBuffer:Message
 ---@field opts Config
----@field new fun(self:Message, opts:Config):Message
 local CurrentBuffer = {}
 
+---Create a new current buffer.
+---@param opts Config The current configuration
+---@return Message
 function CurrentBuffer:new(opts)
   return setmetatable(
     { buf_id = vim.api.nvim_get_current_buf(), opts = opts },

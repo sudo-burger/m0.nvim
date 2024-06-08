@@ -110,7 +110,8 @@ end
 
 --- Get messages from current buffer.
 --- Transform the chat text into a list of 'messages',
---- with format: [{ role = <user|assistant>, content = <str> }]
+--- with format: [{ role = <user|assistant>, content = <str> }].
+--- This is the format used by the OpenAI and Anthropic APIs.
 ---@return table messages
 function CurrentBuffer:get_messages()
   self.buf_id = vim.api.nvim_get_current_buf()
@@ -403,6 +404,7 @@ end
 ---@param backend_name string The name of the backend, as found in the user configuration.
 ---@return nil
 function M.M0backend(backend_name)
+  ---@type LLMAPI
   local API = nil
   local msg = CurrentBuffer:new(Config)
   local opts = Config.backends[backend_name]
@@ -417,14 +419,10 @@ function M.M0backend(backend_name)
 
   -- Backend type handlers.
   if opts.api_type == 'anthropic' then
-    if opts.url == nil then
-      opts.url = Config.default_anthropic_url
-    end
+    opts.url = opts.url or Config.default_anthropic_url
     API = Anthropic:new(opts)
   elseif opts.api_type == 'openai' then
-    if opts.url == nil then
-      opts.url = Config.default_openai_url
-    end
+    opts.url = opts.url or Config.default_openai_url
     API = OpenAI:new(opts)
   else
     error('Invalid backend API type: ' .. (opts.api_type or 'nil'))

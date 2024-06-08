@@ -15,19 +15,6 @@
 ---@field api_type api_type The backend API type.
 ---@field run fun(): nil
 
----@class Config
----@field backends table<Backend>
----@field default_anthropic_version string
----@field default_anthropic_url string
----@field default_backend_name string
----@field default_max_tokens integer
----@field default_openai_url string
----@field default_prompt_name string
----@field default_stream boolean
----@field default_temperature number
----@field prompts table
----@field section_mark string
-
 ---@class State
 ---@field backend? Backend
 ---@field backend_name? string
@@ -206,7 +193,7 @@ function Anthropic:get_headers()
   return {
     content_type = 'application/json',
     x_api_key = self.opts.api_key,
-    anthropic_version = Config.default_anthropic_version,
+    anthropic_version = Config.provider_defaults['anthropic'].api_version,
   }
 end
 
@@ -405,12 +392,11 @@ function M.M0backend(backend_name)
     error('Unable to find API type for backend: ' .. backend_name)
   end
 
+  opts.url = opts.url or Config.provider_defaults[opts.api_type].url
   -- Backend type handlers.
   if opts.api_type == 'anthropic' then
-    opts.url = opts.url or Config.default_anthropic_url
     API = Anthropic:new(opts)
   elseif opts.api_type == 'openai' then
-    opts.url = opts.url or Config.default_openai_url
     API = OpenAI:new(opts)
   else
     error('Invalid backend API type: ' .. (opts.api_type or 'nil'))

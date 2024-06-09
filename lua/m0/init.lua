@@ -334,7 +334,7 @@ local function make_backend(API, msg, opts)
       }
 
       -- Different callbacks needed, depending on whether streaming is enabled or not.
-      if body.stream == true then
+      if opts.stream == true then
         -- The streaming callback appends the reply to the current buffer.
         curl_opts.stream = vim.schedule_wrap(function(_, out, err)
           if next(err._stderr_results) ~= nil then

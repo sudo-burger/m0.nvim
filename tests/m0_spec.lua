@@ -3,10 +3,14 @@ M0 = require 'm0'
 
 -- Invalid prompt.
 Opts = {
+  providers = {
+    ['openai'] = {
+      api_key = 'xxx',
+    },
+  },
   backends = {
     ['openai:gpt-3.5-turbo'] = {
-      api_type = 'openai',
-      api_key = 'xxx',
+      provider = 'openai',
       model = 'gpt-3.5-turbo',
       stream = true,
     },
@@ -28,10 +32,14 @@ end)
 
 -- Invalid backend.
 Opts = {
+  providers = {
+    ['openai'] = {
+      api_key = 'xxx',
+    },
+  },
   backends = {
     ['openai:gpt-3.5-turbo'] = {
-      api_type = 'openai',
-      api_key = 'xxx',
+      provider = 'openai',
       model = 'gpt-3.5-turbo',
       stream = true,
     },
@@ -53,23 +61,28 @@ end)
 
 -- Valid configuration.
 Opts = {
+  providers = {
+    ['openai'] = {
+      api_key = 'xxx',
+    },
+    ['anthropic'] = {
+      api_key = 'xxx',
+    },
+  },
   backends = {
     ['openai:gpt-3.5-turbo'] = {
-      api_type = 'openai',
-      api_key = 'xxx',
+      provider = 'openai',
       model = 'gpt-3.5-turbo',
       stream = true,
     },
     ['anthropic:claude-3-haiku'] = {
-      api_type = 'anthropic',
-      api_key = 'xxx',
+      provider = 'anthropic',
       anthropic_version = '2023-06-01',
       model = 'claude-3-haiku-20240307',
     },
     ['mistral:mistral-large-latest'] = {
-      api_type = 'openai',
+      provider = 'openai',
       url = 'https://api.mistral.ai/v1/chat/completions',
-      api_key = 'xxx',
       model = 'mistral-large-latest',
       max_tokens = 1024,
       temperature = 0.7,
@@ -100,23 +113,23 @@ describe('m0', function()
 end)
 --
 describe('m0', function()
-  local expected = vim.inspect(Opts.backends[Opts.default_backend_name])
+  local expected = Opts.backends[Opts.default_backend_name]
+  local actual = M0.State.backend.opts
   it('has an initial backend', function()
-    assert(
-      vim.inspect(M0.State.backend.opts) == expected,
-      'Expected: '
-        .. expected
-        .. '. Actual: '
-        .. vim.inspect(M0.State.backend.opts)
-    )
+    for k, _ in pairs(expected) do
+      assert(
+        expected[k] == actual[k],
+        'Expected: ' .. expected[k] .. '. Actual: ' .. actual[k]
+      )
+    end
   end)
 end)
 
 describe('m0', function()
   it('can change the backend', function()
     local new_backend_name = 'mistral:mistral-large-latest'
-    local initial_backend_opts = vim.inspect(M0.State.backend.opts)
-    local expected_backend_opts = vim.inspect(Opts.backends[new_backend_name])
+    local initial_backend_opts = M0.State.backend.opts
+    local expected_backend_opts = Opts.backends[new_backend_name]
     assert(
       initial_backend_opts ~= vim.inspect {},
       'The initial backend is empty.'
@@ -130,23 +143,29 @@ describe('m0', function()
       'initial backend is the same as the test backend (should not happen).'
     )
     M0.M0backend(new_backend_name)
-    local actual_backend_opts = vim.inspect(M0.State.backend.opts or {})
-    assert(
-      expected_backend_opts == actual_backend_opts,
-      'Expected: '
-        .. expected_backend_opts
-        .. ' Actual: '
-        .. actual_backend_opts
-    )
+    local actual_backend_opts = M0.State.backend.opts or {}
+    for k, _ in pairs(expected_backend_opts) do
+      assert(
+        expected_backend_opts[k] == actual_backend_opts[k],
+        'Expected: '
+          .. vim.inspect(expected_backend_opts[k])
+          .. ' Actual: '
+          .. vim.inspect(actual_backend_opts[k])
+      )
+    end
     M0.M0backend(Opts.default_backend_name)
-    actual_backend_opts = vim.inspect(M0.State.backend.opts or {})
-    assert(
-      initial_backend_opts == actual_backend_opts,
-      'Cannot restore the inital backend. Expected: '
-        .. initial_backend_opts
-        .. ' Actual: '
-        .. actual_backend_opts
-    )
+    actual_backend_opts = M0.State.backend.opts or {}
+
+    for k, _ in pairs(initial_backend_opts) do
+      assert(
+        vim.inspect(initial_backend_opts[k])
+          == vim.inspect(actual_backend_opts[k]),
+        'Cannot restore the inital backend. Expected: '
+          .. vim.inspect(initial_backend_opts[k])
+          .. ' Actual: '
+          .. vim.inspect(actual_backend_opts[k])
+      )
+    end
   end)
 end)
 

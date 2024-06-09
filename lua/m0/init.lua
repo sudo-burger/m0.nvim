@@ -50,7 +50,7 @@ local M = {
 }
 
 ---@class Config
-Config = require('m0.config').defaults
+Config = require 'm0.config'
 
 ---@class Message
 Message = {}
@@ -182,9 +182,9 @@ end
 function Anthropic:make_body()
   return {
     model = self.opts.model,
-    temperature = self.opts.temperature or Config.default_temperature,
-    max_tokens = self.opts.max_tokens or Config.default_max_tokens,
-    stream = self.opts.stream or Config.default_stream,
+    temperature = self.opts.temperature or Config.defaults.temperature,
+    max_tokens = self.opts.max_tokens or Config.defaults.max_tokens,
+    stream = self.opts.stream or Config.defaults.stream,
     system = M.State.prompt,
   }
 end
@@ -193,7 +193,7 @@ function Anthropic:make_headers()
   return {
     content_type = 'application/json',
     x_api_key = self.opts.api_key,
-    anthropic_version = Config.provider_defaults['anthropic'].api_version,
+    anthropic_version = self.opts.anthropic_version,
   }
 end
 
@@ -249,9 +249,9 @@ end
 function OpenAI:make_body()
   return {
     model = self.opts.model,
-    temperature = self.opts.temperature or Config.default_temperature,
-    max_tokens = self.opts.max_tokens or Config.default_max_tokens,
-    stream = self.opts.stream or Config.default_stream,
+    temperature = self.opts.temperature or Config.defaults.temperature,
+    max_tokens = self.opts.max_tokens or Config.defaults.max_tokens,
+    stream = self.opts.stream or Config.defaults.stream,
   }
 end
 
@@ -383,29 +383,40 @@ function M.M0backend(backend_name)
   ---@type LLMAPI
   local API = nil
   local msg = CurrentBuffer:new(Config)
-  local opts = Config.backends[backend_name]
+  local backend_opts = vim.deepcopy(Config.backends[backend_name])
+  local provider_name = backend_opts.provider
+  local provider_opts = vim.deepcopy(Config.providers[provider_name])
+  local default_opts = vim.deepcopy(Config.defaults.providers[provider_name])
 
-  local backend = Config.backends[backend_name]
-  if not backend then
+  if not backend_opts then
     error("Backend '" .. backend_name .. "' not in configuration.")
   end
 
-  -- Sanity checks.
-  if not backend.api_type then
-    error('Unable to find API type for backend: ' .. backend_name)
+  if not provider_opts then
+    error(
+      "Unable to find provider '"
+        .. provider_name
+        .. "' for backend '"
+        .. backend_name
+        .. "'."
+    )
   end
 
-  opts.url = opts.url or Config.provider_defaults[opts.api_type].url
+  -- Merge the defaults, provider opts, and backend opts.
+  -- The former are overridden by the latter.
+  backend_opts =
+    vim.tbl_extend('force', default_opts, provider_opts, backend_opts)
+
   -- Backend type handlers.
-  if opts.api_type == 'anthropic' then
-    API = Anthropic:new(opts)
-  elseif opts.api_type == 'openai' then
-    API = OpenAI:new(opts)
+  if backend_opts.api_type == 'anthropic' then
+    API = Anthropic:new(backend_opts)
+  elseif backend_opts.api_type == 'openai' then
+    API = OpenAI:new(backend_opts)
   else
-    error('Invalid backend API type: ' .. (opts.api_type or 'nil'))
+    error('Invalid backend API type: ' .. (backend_opts.api_type or 'nil'))
   end
 
-  M.State.backend = make_backend(API, msg, opts)
+  M.State.backend = make_backend(API, msg, backend_opts)
 end
 
 ---Select prompt interactively.

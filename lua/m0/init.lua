@@ -385,11 +385,13 @@ function M.M0backend(backend_name)
   local msg = CurrentBuffer:new(Config)
   local opts = Config.backends[backend_name]
 
-  -- Sanity checks.
-  if opts == nil then
+  local backend = Config.backends[backend_name]
+  if not backend then
     error("Backend '" .. backend_name .. "' not in configuration.")
   end
-  if opts.api_type == nil then
+
+  -- Sanity checks.
+  if not backend.api_type then
     error('Unable to find API type for backend: ' .. backend_name)
   end
 

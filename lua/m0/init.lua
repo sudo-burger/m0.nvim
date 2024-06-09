@@ -182,9 +182,9 @@ end
 function Anthropic:make_body()
   return {
     model = self.opts.model,
-    temperature = self.opts.temperature or Config.defaults.temperature,
-    max_tokens = self.opts.max_tokens or Config.defaults.max_tokens,
-    stream = self.opts.stream or Config.defaults.stream,
+    temperature = self.opts.temperature,
+    max_tokens = self.opts.max_tokens,
+    stream = self.opts.stream,
     system = M.State.prompt,
   }
 end
@@ -249,9 +249,9 @@ end
 function OpenAI:make_body()
   return {
     model = self.opts.model,
-    temperature = self.opts.temperature or Config.defaults.temperature,
-    max_tokens = self.opts.max_tokens or Config.defaults.max_tokens,
-    stream = self.opts.stream or Config.defaults.stream,
+    temperature = self.opts.temperature,
+    max_tokens = self.opts.max_tokens,
+    stream = self.opts.stream,
   }
 end
 

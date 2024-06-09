@@ -34,8 +34,8 @@
 ---Abstract class for LLM APIs.
 ---@class LLMAPI
 ---@field opts table The API configuration.
----@field get_body fun():table Get the API request body.
----@field get_headers fun():table Get the API request headers.
+---@field make_body fun():table Makethe API request body.
+---@field make_headers fun():table Make the API request headers.
 ---@field get_messages fun(messages:table):table? get the chat messages.
 ---@field get_response_text fun(data:string):string? Returns the text content of an API response.
 ---Returns delta_event,data
@@ -179,7 +179,7 @@ function Anthropic:new(opts)
   )
 end
 
-function Anthropic:get_body()
+function Anthropic:make_body()
   return {
     model = self.opts.model,
     temperature = self.opts.temperature or Config.default_temperature,
@@ -189,7 +189,7 @@ function Anthropic:get_body()
   }
 end
 
-function Anthropic:get_headers()
+function Anthropic:make_headers()
   return {
     content_type = 'application/json',
     x_api_key = self.opts.api_key,
@@ -246,7 +246,7 @@ function OpenAI:new(opts)
   )
 end
 
-function OpenAI:get_body()
+function OpenAI:make_body()
   return {
     model = self.opts.model,
     temperature = self.opts.temperature or Config.default_temperature,
@@ -255,7 +255,7 @@ function OpenAI:get_body()
   }
 end
 
-function OpenAI:get_headers()
+function OpenAI:make_headers()
   return {
     content_type = 'application/json',
     authorization = 'Bearer ' .. self.opts.api_key,
@@ -323,12 +323,13 @@ local function make_backend(API, msg, opts)
     opts = opts,
     name = opts.backend_name,
     run = function()
-      local body = API:get_body()
+      local body = API:make_body()
+
       -- Message are specific to each run.
       body.messages = API:get_messages(msg:get_messages())
 
       local curl_opts = {
-        headers = API:get_headers(),
+        headers = API:make_headers(),
         body = vim.fn.json_encode(body),
       }
 

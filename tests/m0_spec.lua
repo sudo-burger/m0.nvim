@@ -105,7 +105,7 @@ end)
 describe('m0', function()
   it('can debug', function()
     assert.has_no.errors(function()
-      local debug = M0.debug()
+      local debug = M0:debug()
       ---@diagnostic disable-next-line: unused-local
       local len = string.len(debug)
     end)
@@ -142,7 +142,7 @@ describe('m0', function()
       initial_backend_opts ~= expected_backend_opts,
       'initial backend is the same as the test backend (should not happen).'
     )
-    M0.M0backend(new_backend_name)
+    M0:M0backend(new_backend_name)
     local actual_backend_opts = M0.State.backend.opts or {}
     for k, _ in pairs(expected_backend_opts) do
       assert(
@@ -153,7 +153,7 @@ describe('m0', function()
           .. vim.inspect(actual_backend_opts[k])
       )
     end
-    M0.M0backend(Opts.default_backend_name)
+    M0:M0backend(Opts.default_backend_name)
     actual_backend_opts = M0.State.backend.opts or {}
 
     for k, _ in pairs(initial_backend_opts) do
@@ -189,14 +189,14 @@ describe('m0', function()
       local new_prompt_name = 'Charles Bukowski'
       local expected = Opts.prompts[new_prompt_name]
 
-      M0.M0prompt(new_prompt_name)
+      M0:M0prompt(new_prompt_name)
       assert(
         expected == M0.State.prompt,
         'Expected: ' .. expected .. '. Actual: ' .. M0.State.prompt
       )
     end
   )
-  M0.M0backend 'anthropic:claude-3-haiku'
+  M0:M0backend 'anthropic:claude-3-haiku'
   it(
     'can change the prompt when the backend is '
       .. vim.inspect(M0.State.backend.opts.type),
@@ -204,7 +204,7 @@ describe('m0', function()
       local new_prompt_name = 'Marilyn Monroe'
       local expected = Opts.prompts[new_prompt_name]
 
-      M0.M0prompt(new_prompt_name)
+      M0:M0prompt(new_prompt_name)
       assert(
         expected == M0.State.prompt,
         'Expected: ' .. expected .. '. Actual: ' .. M0.State.prompt

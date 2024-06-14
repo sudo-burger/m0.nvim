@@ -201,11 +201,11 @@ function Anthropic:get_messages(messages)
 end
 
 function Anthropic:get_response_text(data)
-  local j = vim.fn.json_decode(data)
-  if j ~= nil and j.content ~= nil then
-    return j.content[1].text
+  local success, j = pcall(vim.fn.json_decode, data)
+  if not success or j ~= nil or j.content ~= nil then
+    error('Received: ' .. data)
   else
-    vim.notify('Received: ' .. data)
+    return j.content[1].text
   end
 end
 
@@ -270,11 +270,11 @@ function OpenAI:get_messages(messages)
 end
 
 function OpenAI:get_response_text(data)
-  local j = vim.fn.json_decode(data)
-  if j ~= nil and j.choices ~= nil then
-    return j.choices[1].message.content
-  else
+  local success, j = pcall(vim.fn.json_decode, data)
+  if not success or j ~= nil or j.choices ~= nil then
     vim.notify('Received: ' .. data)
+  else
+    return j.choices[1].message.content
   end
 end
 
@@ -335,9 +335,9 @@ local function make_backend(API, msg, opts)
       -- Different callbacks needed, depending on whether streaming is enabled or not.
       if opts.stream == true then
         -- The streaming callback appends the reply to the current buffer.
-        curl_opts.stream = vim.schedule_wrap(function(_, out, err)
-          if next(err._stderr_results) ~= nil then
-            vim.notify('Stream error (1): ' .. vim.inspect(err), vim.log.ERROR)
+        curl_opts.stream = vim.schedule_wrap(function(err, out, _)
+          if err then
+            vim.notify('Stream error (1): ' .. err, vim.log.ERROR)
             return
           end
           local event, d = API:get_delta_text(out)
@@ -347,7 +347,7 @@ local function make_backend(API, msg, opts)
             msg:set_last_line(msg:get_last_line() .. d)
           elseif event == 'other' and d ~= '' then
             -- Could be an error.
-            msg:append_lines(vim.fn.split(d, '\n', true))
+            vim.notify(d)
           elseif event == 'done' then
             msg:close_section()
           else
@@ -359,15 +359,25 @@ local function make_backend(API, msg, opts)
         -- Not streaming.
         -- We append the LLM's reply to the current buffer at one go.
         curl_opts.callback = vim.schedule_wrap(function(out)
+          vim.notify('Got (0): ' .. vim.inspect(out))
+          vim.notify(
+            'Got (1): '
+              .. vim.fn.json_decode(out.body).choices[1].message.content
+          )
           -- Build the reply in the message handler.
-          msg:set_last_line(API.get_response_text(out.body))
+          local res = API:get_response_text(out.body)
+          vim.notify('Got (2): ' .. vim.inspect(res))
+          msg:set_last_line(res)
           msg:close_section()
         end)
       end
 
       -- The closing section mark is printed by the curl callbacks.
       msg:open_section()
-      require('plenary.curl').post(opts.url, curl_opts)
+      local res = require('plenary.curl').post(opts.url, curl_opts)
+      if next(res._stderr_results) ~= nil then
+        vim.notify('API error (1): ' .. vim.inspect(res))
+      end
     end,
   }
 end

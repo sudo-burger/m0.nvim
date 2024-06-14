@@ -47,10 +47,12 @@
 local M = {
   ---@class State
   State = {},
-}
-
+  ---@class Config
+  Config = require 'm0.config',
 ---@class Config
 Config = require 'm0.config'
+
+}
 
 ---@class Message
 Message = {}
@@ -91,7 +93,7 @@ end
 function CurrentBuffer:get_messages()
   self.buf_id = vim.api.nvim_get_current_buf()
   local messages = {}
-  local section_mark = Config.section_mark
+  local section_mark = self.opts.section_mark
   local conversation = nil
 
   local mode = vim.api.nvim_get_mode().mode
@@ -379,14 +381,15 @@ end
 ---Select backend interactively.
 ---@param backend_name string The name of the backend, as found in the user configuration.
 ---@return nil
-function M.M0backend(backend_name)
+function M:M0backend(backend_name)
   ---@type LLMAPI
   local API = nil
-  local msg = CurrentBuffer:new(Config)
-  local backend_opts = vim.deepcopy(Config.backends[backend_name])
+  local msg = CurrentBuffer:new(self.Config)
+  local backend_opts = vim.deepcopy(self.Config.backends[backend_name])
   local provider_name = backend_opts.provider
-  local provider_opts = vim.deepcopy(Config.providers[provider_name])
-  local default_opts = vim.deepcopy(Config.defaults.providers[provider_name])
+  local provider_opts = vim.deepcopy(self.Config.providers[provider_name])
+  local default_opts =
+    vim.deepcopy(self.Config.defaults.providers[provider_name])
 
   if not backend_opts then
     error("Backend '" .. backend_name .. "' not in configuration.")
@@ -422,12 +425,12 @@ end
 ---Select prompt interactively.
 ---@param prompt_name string
 ---@return nil
-function M.M0prompt(prompt_name)
-  if Config.prompts[prompt_name] == nil then
+function M:M0prompt(prompt_name)
+  if self.Config.prompts[prompt_name] == nil then
     error("Prompt '" .. prompt_name .. "' not in configuration.")
   end
-  M.State.prompt_name = prompt_name
-  M.State.prompt = Config.prompts[prompt_name]
+  self.State.prompt_name = prompt_name
+  self.State.prompt = self.Config.prompts[prompt_name]
 end
 
 --- Run a chat round.
@@ -438,34 +441,34 @@ end
 --- Sets up the m0 plugin.
 ---@param user_config table The user configuration.
 function M.setup(user_config)
-  Config = vim.tbl_extend('force', Config, user_config or {})
-  if Config.backends[Config.default_backend_name] == nil then
+  M.Config = vim.tbl_extend('force', M.Config, user_config or {})
+  if M.Config.backends[M.Config.default_backend_name] == nil then
     error(
       'Default backend ('
-        .. Config.default_backend_name
+        .. M.Config.default_backend_name
         .. ') not in configuration.'
     )
   end
-  if Config.prompts[Config.default_prompt_name] == nil then
+  if M.Config.prompts[M.Config.default_prompt_name] == nil then
     error(
       'Default prompt ('
-        .. Config.default_prompt_name
+        .. M.Config.default_prompt_name
         .. ') not in configuration.'
     )
   end
-  M.M0prompt(Config.default_prompt_name)
-  M.M0backend(Config.default_backend_name)
+  M:M0prompt(M.Config.default_prompt_name)
+  M:M0backend(M.Config.default_backend_name)
 
   -- User commands
   -- -------------
 
   vim.api.nvim_create_user_command('M0prompt', function(opts)
-    M.M0prompt(opts.args)
+    M:M0prompt(opts.args)
   end, {
     nargs = 1,
     complete = function()
       local ret = {}
-      for k, _ in pairs(Config.prompts) do
+      for k, _ in pairs(self.Config.prompts) do
         table.insert(ret, k)
       end
       table.sort(ret)
@@ -474,12 +477,12 @@ function M.setup(user_config)
   })
 
   vim.api.nvim_create_user_command('M0backend', function(opts)
-    M.M0backend(opts.args)
+    M:M0backend(opts.args)
   end, {
     nargs = 1,
     complete = function()
       local ret = {}
-      for k, _ in pairs(Config.backends) do
+      for k, _ in pairs(self.Config.backends) do
         table.insert(ret, k)
       end
       table.sort(ret)
@@ -505,11 +508,11 @@ end
 
 ---Returns various debug information as a string.
 ---@return string
-function M.debug()
+function M:debug()
   return 'State:\n'
     .. vim.inspect(M.State)
     .. '\nConfiguration: '
-    .. vim.inspect(Config)
+    .. vim.inspect(self.Config)
 end
 
 return M

@@ -49,9 +49,6 @@ local M = {
   State = {},
   ---@class Config
   Config = require 'm0.config',
----@class Config
-Config = require 'm0.config'
-
 }
 
 ---@class Message

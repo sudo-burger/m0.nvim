@@ -5,7 +5,7 @@
 ---@alias delta_event
 ---| '"delta"' # the server sent a text delta
 ---| '"cruft"' # the server sent data we consider to be cruft
----| '"done"' # the server signalled that the text transfer is done.
+---| '"done"' # the server signaled that the text transfer is done.
 ---| '"other"' # we received something we cannot interpret.
 
 ---Abstracts backend.
@@ -27,7 +27,7 @@
 ---@field get_messages fun():table
 ---@field append_lines fun()
 ---@field get_last_line fun():string
----@field set_last_line fun(string)
+---@field set_last_line fun(Message, string)
 ---@field open_section fun()
 ---@field close_section fun()
 

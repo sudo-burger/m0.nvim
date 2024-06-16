@@ -436,6 +436,15 @@ function M.M0chat()
   M.State.backend.run()
 end
 
+---Returns various debug information as a string.
+---@return string
+function M:debug()
+  return 'State:\n'
+    .. vim.inspect(self.State)
+    .. '\nConfiguration: '
+    .. vim.inspect(self.Config)
+end
+
 --- Sets up the m0 plugin.
 ---@param user_config table The user configuration.
 function M.setup(user_config)

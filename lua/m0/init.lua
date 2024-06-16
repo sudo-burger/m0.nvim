@@ -44,6 +44,8 @@
 ---@async
 ---@field get_delta_text? fun(LLMAPI:LLMAPI, body:string):delta_event,string
 
+Utils = require 'm0.utils'
+
 local M = {
   ---@class State
   State = {},
@@ -337,7 +339,7 @@ local function make_backend(API, msg, opts)
         -- The streaming callback appends the reply to the current buffer.
         curl_opts.stream = vim.schedule_wrap(function(err, out, _)
           if err then
-            vim.notify('Stream error (1): ' .. err, vim.log.ERROR)
+            Utils:log_error('Stream error (1): ' .. err)
             return
           end
           local event, d = API:get_delta_text(out)
@@ -347,7 +349,7 @@ local function make_backend(API, msg, opts)
             msg:set_last_line(msg:get_last_line() .. d)
           elseif event == 'other' and d ~= '' then
             -- Could be an error.
-            vim.notify(d)
+            Utils:log_info(d)
           elseif event == 'done' then
             msg:close_section()
           else
@@ -376,7 +378,7 @@ local function make_backend(API, msg, opts)
       msg:open_section()
       local res = require('plenary.curl').post(opts.url, curl_opts)
       if next(res._stderr_results) ~= nil then
-        vim.notify('API error (1): ' .. vim.inspect(res))
+        Utils:log_error('API error (1): ' .. vim.inspect(res))
       end
     end,
   }

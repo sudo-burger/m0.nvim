@@ -106,23 +106,19 @@ function CurrentBuffer:get_messages()
 
   -- In conversations, the 'user' and 'assistant' take turns.
   -- "Section marks" are used to signal the switches between the two roles.
-  local i = 1
-  local role = {
-    'user',
-    'assistant',
-  }
   -- Assume the first message to be the user's.
-  local role_idx = 1
+  local role = 'user'
+  local i = 1
   while i <= #conversation do
     -- Switch between roles when meeting a section mark in the conversation.
     if conversation[i] == section_mark then
       -- Switch role.
-      role_idx = role_idx == 1 and 2 or 1
+      role = role == 'user' and 'assistant' or 'user'
       i = i + 1
     end
 
     -- Build a message.
-    local message = { role = role[role_idx], content = '' }
+    local message = { role = role, content = '' }
     while i <= #conversation and conversation[i] ~= section_mark do
       message.content = message.content .. conversation[i] .. '\n'
       i = i + 1

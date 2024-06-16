@@ -355,11 +355,6 @@ local function make_backend(API, msg, opts)
         -- Not streaming.
         -- We append the LLM's reply to the current buffer at one go.
         curl_opts.callback = vim.schedule_wrap(function(out)
-          vim.notify('Got (0): ' .. vim.inspect(out))
-          vim.notify(
-            'Got (1): '
-              .. vim.fn.json_decode(out.body).choices[1].message.content
-          )
           -- Build the reply in the message handler.
           local res = API:get_response_text(out.body)
           vim.notify('Got (2): ' .. vim.inspect(res))

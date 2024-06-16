@@ -117,11 +117,7 @@ function CurrentBuffer:get_messages()
     -- Switch between roles when meeting a section mark in the conversation.
     if conversation[i] == section_mark then
       -- Switch role.
-      if role_idx == 1 then
-        role_idx = 2
-      else
-        role_idx = 1
-      end
+      role_idx = role_idx == 1 and 2 or 1
       i = i + 1
     end
 

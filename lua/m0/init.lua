@@ -202,9 +202,8 @@ function Anthropic:get_response_text(data)
   local success, j = pcall(vim.fn.json_decode, data)
   if not success or j ~= nil or j.content ~= nil then
     error('Received: ' .. data)
-  else
-    return j.content[1].text
   end
+  return j.content[1].text
 end
 
 function Anthropic:get_delta_text(body)
@@ -270,10 +269,9 @@ end
 function OpenAI:get_response_text(data)
   local success, j = pcall(vim.fn.json_decode, data)
   if not success or j ~= nil or j.choices ~= nil then
-    vim.notify('Received: ' .. data)
-  else
-    return j.choices[1].message.content
+    error('Received: ' .. data)
   end
+  return j.choices[1].message.content
 end
 
 function OpenAI:get_delta_text(body)

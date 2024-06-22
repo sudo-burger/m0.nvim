@@ -195,8 +195,8 @@ function Anthropic:get_messages(messages)
 end
 
 function Anthropic:get_response_text(data)
-  local success, j = pcall(vim.fn.json_decode, data)
-  if not success or j ~= nil or j.content ~= nil then
+  local j = Utils:json_decode(data)
+  if j.content == nil then
     error('Received: ' .. data)
   end
   return j.content[1].text
@@ -215,9 +215,13 @@ function Anthropic:get_delta_text(body)
     -- We are in a 'data: ' package now.
     -- Extract and return the text payload.
     --
-    local j = vim.fn.json_decode(string.sub(body, 7))
-    if j ~= nil and j.type == 'content_block_delta' and j.delta.text ~= nil then
-      return 'delta', j.delta.text
+    local json_data = Utils:json_decode(string.sub(body, 7))
+    if
+      json_data ~= nil
+      and json_data.type == 'content_block_delta'
+      and json_data.delta.text ~= nil
+    then
+      return 'delta', json_data.delta.text
     end
   else
     return 'other', body
@@ -263,8 +267,8 @@ function OpenAI:get_messages(messages)
 end
 
 function OpenAI:get_response_text(data)
-  local success, j = pcall(vim.fn.json_decode, data)
-  if not success or j ~= nil or j.choices ~= nil then
+  local j = Utils:json_decode(data)
+  if j.choices == nil then
     error('Received: ' .. data)
   end
   return j.choices[1].message.content
@@ -287,13 +291,13 @@ function OpenAI:get_delta_text(body)
     --   choices[1].delta == {}
     --   choices[1].finish_reason == 'stop'
     --
-    local j = vim.fn.json_decode(string.sub(body, 7))
+    local json_data = Utils:json_decode(string.sub(body, 7))
     if
-      j ~= nil
-      and j.object == 'chat.completion.chunk'
-      and j.choices[1].delta.content ~= nil
+      json_data ~= nil
+      and json_data.object == 'chat.completion.chunk'
+      and json_data.choices[1].delta.content ~= nil
     then
-      return 'delta', j.choices[1].delta.content
+      return 'delta', json_data.choices[1].delta.content
     end
   else
     return 'other', body

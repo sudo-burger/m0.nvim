@@ -1,4 +1,10 @@
 ---@class Utils
+---@field log_error fun(self:Utils, message: string):nil
+---@field log_info fun(self:Utils, message: string):nil
+---@field safe_call fun(self:Utils, func: fun(), ...):any
+---@field json_decode fun(self:Utils, data: any):any
+
+---@type Utils
 local M = {}
 
 function M:log_error(message)
@@ -18,8 +24,6 @@ function M:safe_call(func, ...)
 end
 
 --- Safe json_decode.
----@param data any
----@return any
 function M:json_decode(data)
   return M:safe_call(vim.fn.json_decode, data)
 end

@@ -1,12 +1,18 @@
-local M = {}
 local LLMAPI = require 'm0.llmapi'
 local Utils = require 'm0.utils'
 
+---@class OpenAIMessage:RawMessage
+---@field role string
+---@field content string
+
 ---@class OpenAI :LLMAPI
----@field new fun(LLMAPI, table):LLMAPI
+---@field new fun(self:LLMAPI, backend_opts:BackendOptions, state: table):LLMAPI
+---@field get_messages fun(self:OpenAI, messages:RawMessage[]):OpenAIMessage[]
 ---@field opts table
 ---@field state table
 
+---@type OpenAI
+local M = {}
 function M:new(opts, state)
   return setmetatable(
     { opts = opts, state = state },

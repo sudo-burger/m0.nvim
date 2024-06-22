@@ -1,11 +1,18 @@
-local M = {}
 local LLMAPI = require 'm0.llmapi'
 local Utils = require 'm0.utils'
----
+
+---@class AnthropicMessage:RawMessage
+---@field role string
+---@field content string
+
 ---@class Anthropic:LLMAPI
----@field new fun(LLMAPI, table):LLMAPI
+---@field new fun(self:LLMAPI, backend_opts:BackendOptions, state: table):LLMAPI
+---@field get_messages fun(self:Anthropic, messages:RawMessage[]):AnthropicMessage[]
 ---@field opts table
 ---@field state table
+
+---@type Anthropic
+local M = {}
 
 function M:new(opts, state)
   return setmetatable(

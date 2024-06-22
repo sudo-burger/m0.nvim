@@ -1,10 +1,3 @@
----@alias delta_event_type
----| "delta" # the server sent a text delta
----| "cruft" # the server sent data we consider to be cruft
----| "done" # the server signaled that the text transfer is done.
----| "other" # we received something we cannot interpret.
-
----Abstracts backend.
 ---@class Backend
 ---@field opts BackendOptions
 ---@field run fun(): nil
@@ -14,14 +7,8 @@
 ---@field prompt string?
 ---@field prompt_name string?
 
--- Abstract class for message handlers.
----@class Message
----@field get_messages fun():table
----@field append_lines fun()
----@field get_last_line fun():string
----@field set_last_line fun(Message, string)
----@field open_section fun()
----@field close_section fun()
+---@type Message
+Message = require 'm0.message'
 
 ---@type APIFactory
 local APIFactory = require 'm0.apifactory'
@@ -37,12 +24,11 @@ local M = {
 }
 M.__index = M
 
----@class Message
-Message = {}
-Message.__index = Message
-
 ---@class CurrentBuffer:Message
 ---@field opts Config
+---@field buf_id integer
+
+---@type CurrentBuffer
 local CurrentBuffer = {}
 
 ---Create a new current buffer.
@@ -72,7 +58,7 @@ end
 --- Transform the chat text into a list of 'messages',
 --- with format: [{ role = <user|assistant>, content = <str> }].
 --- This is the format used by the OpenAI and Anthropic APIs.
----@return table messages
+---@return Message[]
 function CurrentBuffer:get_messages()
   self.buf_id = vim.api.nvim_get_current_buf()
   local messages = {}
@@ -240,17 +226,6 @@ function M:M0backend(backend_name)
   -- The former are overridden by the latter.
   backend_opts =
     vim.tbl_extend('force', default_opts, provider_opts, backend_opts)
-
-  local APIHandlers = {
-    anthropic = M,
-    openai = M,
-  }
-
-  local APIHandler = APIHandlers[backend_opts.api_type]
-  -- Backend type handlers.
-  if not APIHandler then
-    error('Invalid backend API type: ' .. (backend_opts.api_type or 'nil'))
-  end
 
   ---@type LLMAPI
   local API = APIFactory.create(backend_opts.api_type, backend_opts, M.State)

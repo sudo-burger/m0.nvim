@@ -70,6 +70,7 @@ function M:get_messages()
     end
 
     table.insert(messages, message)
+    i = i + 1
   end
   return messages
 end

@@ -1,7 +1,9 @@
+require 'm0.message'
+
 local LLMAPI = require 'm0.llmapi'
 local Utils = require 'm0.utils'
 
----@class OpenAIMessage:RawMessage
+---@class OpenAIMessage
 ---@field role string
 ---@field content string
 
@@ -36,11 +38,20 @@ function M:make_headers()
   }
 end
 
-function M:get_messages(messages)
+function M:get_messages(raw_messages)
+  ---@type OpenAIMessage[]
+  local messages = {}
+  local role = 'user'
+  local i = 1
   -- The OpenAI completions API requires the prompt to be
   -- the first message (with role 'system').
   -- Patch the messages here.
   table.insert(messages, 1, { role = 'system', content = self.state.prompt })
+  while i <= #raw_messages do
+    table.insert(messages, { role = role, content = raw_messages[i] })
+    role = role == 'user' and 'assistant' or 'user'
+    i = i + 1
+  end
   return messages
 end
 

@@ -7,9 +7,6 @@
 ---@field prompt string?
 ---@field prompt_name string?
 
----@type Message
-Message = require 'm0.message'
-
 ---@type APIFactory
 local APIFactory = require 'm0.apifactory'
 
@@ -25,12 +22,12 @@ local M = {
 M.__index = M
 
 ---@type VimBuffer
-local CurrentBuffer = require 'm0.vimbuffer'
+local VimBuffer = require 'm0.vimbuffer'
 
 ---Returns a table including the backend-specific implementation of the function run().
 ---
 ---@param API LLMAPI The API handler.
----@param msg Message The message handler.
+---@param msg VimBuffer
 ---@param opts BackendOptions
 ---@return Backend
 local function make_backend(API, msg, opts)
@@ -99,7 +96,7 @@ end
 ---@param backend_name string The name of the backend, as found in the user configuration.
 ---@return nil
 function M:M0backend(backend_name)
-  local msg = CurrentBuffer:new(self.Config)
+  local msg = VimBuffer:new(self.Config)
   -- Use deepcopy to avoid cluttering the configuration with backend-specific settings.
   local backend_opts = vim.deepcopy(self.Config.backends[backend_name])
   local provider_name = backend_opts.provider

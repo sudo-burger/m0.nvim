@@ -1,7 +1,9 @@
+require 'm0.message'
+
 local LLMAPI = require 'm0.llmapi'
 local Utils = require 'm0.utils'
 
----@class AnthropicMessage:RawMessage
+---@class AnthropicMessage
 ---@field role string
 ---@field content string
 
@@ -39,7 +41,16 @@ function M:make_headers()
   }
 end
 
-function M:get_messages(messages)
+function M:get_messages(raw_messages)
+  ---@type AnthropicMessage[]
+  local messages = {}
+  local role = 'user'
+  local i = 1
+  while i <= #raw_messages do
+    table.insert(messages, { role = role, content = raw_messages[i] })
+    role = role == 'user' and 'assistant' or 'user'
+    i = i + 1
+  end
   return messages
 end
 

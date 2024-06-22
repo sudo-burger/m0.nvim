@@ -1,11 +1,11 @@
 require 'm0.message'
 
 ---@class VimBuffer
----@field opts? Config
----@field buf_id? integer
+---@field opts Config | nil
+---@field buf_id integer | nil
 ---@field new? fun(self:VimBuffer, opts:table):VimBuffer
----@field get_visual_selection? fun(self:VimBuffer):table<string>
----@field get_messages? fun(self:VimBuffer):table<string>
+---@field get_visual_selection? fun(self:VimBuffer):string[]
+---@field get_messages? fun(self:VimBuffer):RawMessage[]
 ---@field append_lines? fun(self:VimBuffer, lines:string[])
 ---@field get_last_line? fun(self:VimBuffer):string
 ---@field set_last_line? fun(self:VimBuffer, txt:string)
@@ -13,7 +13,10 @@ require 'm0.message'
 ---@field close_section? fun(self:VimBuffer)
 
 ---@type VimBuffer
-local M = {}
+local M = {
+  opts = nil,
+  buf_id = nil,
+}
 
 ---@param opts Config The current configuration
 ---@return VimBuffer
@@ -25,7 +28,6 @@ function M:new(opts)
 end
 
 ---Get the currently selected text.
----@return table selected An array of lines.
 function M:get_visual_selection()
   local sline = vim.fn.line 'v'
   local eline = vim.fn.line '.'
@@ -56,24 +58,14 @@ function M:get_messages()
     conversation = vim.api.nvim_buf_get_lines(self.buf_id, 0, -1, false)
   end
 
-  -- In conversations, the 'user' and 'assistant' take turns.
-  -- "Section marks" are used to signal the switches between the two roles.
-  -- Assume the first message to be the user's.
-  local role = 'user'
   local i = 1
   -- Iterate through the conversation.
   while i <= #conversation do
-    -- When meeting a section mark, switch roles.
-    if conversation[i] == section_mark then
-      -- Switch role.
-      role = role == 'user' and 'assistant' or 'user'
-      i = i + 1
-    end
-
-    -- Build a message for the current role.
-    local message = { role = role, content = '' }
+    local message = ''
+    -- In conversations, the 'user' and AI take turns.
+    -- "Section marks" are used to signal the switches between the two roles.
     while i <= #conversation and conversation[i] ~= section_mark do
-      message.content = message.content .. conversation[i] .. '\n'
+      message = message .. conversation[i] .. '\n'
       i = i + 1
     end
 

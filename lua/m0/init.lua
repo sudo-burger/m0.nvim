@@ -74,7 +74,9 @@ local function make_backend(API, msg, opts)
         curl_opts.callback = vim.schedule_wrap(function(out)
           -- Build the reply in the message handler.
           local res = API:get_response_text(out.body)
-          msg:set_last_line(res)
+          if res then
+            msg:set_last_line(res)
+          end
           msg:close_section()
         end)
       end
@@ -84,6 +86,7 @@ local function make_backend(API, msg, opts)
       local response = require('plenary.curl').post(opts.url, curl_opts)
       if response.status ~= nil and response.status ~= 200 then
         Utils:log_error('API error (1): ' .. vim.inspect(response))
+        return
       end
     end,
   }
@@ -123,8 +126,12 @@ function M:M0backend(backend_name)
   backend_opts =
     vim.tbl_extend('force', default_opts, provider_opts, backend_opts)
 
-  ---@type LLMAPI
+  ---@type LLMAPI?
   local API = APIFactory.create(backend_opts.api_type, backend_opts, M.State)
+  if not API then
+    Utils:log_error('Unable create API for ' .. backend_opts.api_type)
+    return
+  end
 
   M.State.backend = make_backend(API, msg, backend_opts)
 end

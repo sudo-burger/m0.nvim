@@ -13,7 +13,7 @@ local APIHandlers = {
 ---@param api_type api_type
 ---@param opts BackendOptions
 ---@param state table reference to current state.
----@return LLMAPI
+---@return LLMAPI?
 function M.create(api_type, opts, state)
   local APIHandler = APIHandlers[api_type]
   if not APIHandler then

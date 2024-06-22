@@ -23,21 +23,11 @@
 ---@field open_section fun()
 ---@field close_section fun()
 
----Abstract class for LLM APIs.
----@class LLMAPI
----@field opts BackendOptions
----@field make_body fun():table Makethe API request body.
----@field make_headers fun():table Make the API request headers.
----@field get_messages fun(self:LLMAPI, messages:table):table<Message> get the chat messages.
----@field get_response_text fun(self:LLMAPI, data:string):string? Returns the text content of an API response.
----Returns delta_event,data
----where
----  data: the delta text (for delta_event "delta"), or the http body for other events.
----@async
----@field get_delta_text? fun(LLMAPI:LLMAPI, body:string):delta_event_type,string
+---@type APIFactory
+local APIFactory = require 'm0.apifactory'
 
 ---@type Utils
-Utils = require 'm0.utils'
+local Utils = require 'm0.utils'
 
 local M = {
   ---@type State
@@ -152,156 +142,6 @@ function CurrentBuffer:close_section()
   self:append_lines { self.opts.section_mark, '' }
 end
 
----@class LLMAPI
-LLMAPI = {}
-LLMAPI.__index = LLMAPI
-
----@class Anthropic:LLMAPI
----@field new fun(LLMAPI, table):LLMAPI
----@field opts table
-local Anthropic = {}
-function Anthropic:new(opts)
-  return setmetatable(
-    { opts = opts },
-    { __index = setmetatable(Anthropic, LLMAPI) }
-  )
-end
-
-function Anthropic:make_body()
-  return {
-    model = self.opts.model,
-    temperature = self.opts.temperature,
-    max_tokens = self.opts.max_tokens,
-    stream = self.opts.stream,
-    system = M.State.prompt,
-  }
-end
-
-function Anthropic:make_headers()
-  return {
-    content_type = 'application/json',
-    x_api_key = self.opts.api_key,
-    anthropic_version = self.opts.anthropic_version,
-  }
-end
-
-function Anthropic:get_messages(messages)
-  return messages
-end
-
-function Anthropic:get_response_text(data)
-  local j = Utils:json_decode(data)
-  if j.content == nil then
-    error('Received: ' .. data)
-  end
-  return j.content[1].text
-end
-
-function Anthropic:get_delta_text(body)
-  if body == 'event: message_stop' then
-    return 'done', body
-  end
-
-  if body == '\n' or body == '' or string.find(body, '^event: ') ~= nil then
-    return 'cruft', body
-  end
-
-  if string.find(body, '^data: ') ~= nil then
-    -- We are in a 'data: ' package now.
-    -- Extract and return the text payload.
-    --
-    local json_data = Utils:json_decode(string.sub(body, 7))
-    if
-      json_data ~= nil
-      and json_data.type == 'content_block_delta'
-      and json_data.delta.text ~= nil
-    then
-      return 'delta', json_data.delta.text
-    end
-  else
-    return 'other', body
-  end
-  -- Not data, so most likely metadata that we only would want to see for
-  -- debugging purposes.
-  return 'cruft', body
-end
-
----@class OpenAI :LLMAPI
----@field new fun(LLMAPI, table):LLMAPI
----@field opts table
-local OpenAI = {}
-function OpenAI:new(opts)
-  return setmetatable(
-    { opts = opts },
-    { __index = setmetatable(OpenAI, LLMAPI) }
-  )
-end
-
-function OpenAI:make_body()
-  return {
-    model = self.opts.model,
-    temperature = self.opts.temperature,
-    max_tokens = self.opts.max_tokens,
-    stream = self.opts.stream,
-  }
-end
-
-function OpenAI:make_headers()
-  return {
-    content_type = 'application/json',
-    authorization = 'Bearer ' .. self.opts.api_key,
-  }
-end
-
-function OpenAI:get_messages(messages)
-  -- The OpenAI completions API requires the prompt to be
-  -- the first message (with role 'system').
-  -- Patch the messages here.
-  table.insert(messages, 1, { role = 'system', content = M.State.prompt })
-  return messages
-end
-
-function OpenAI:get_response_text(data)
-  local j = Utils:json_decode(data)
-  if j.choices == nil then
-    error('Received: ' .. data)
-  end
-  return j.choices[1].message.content
-end
-
-function OpenAI:get_delta_text(body)
-  if body == 'data: [DONE]' then
-    return 'done', body
-  end
-
-  if body == '\n' or body == '' then
-    return 'cruft', body
-  end
-
-  if string.find(body, '^data: ') ~= nil then
-    -- We are in a 'data: ' package now.
-    -- Extract and return the text payload.
-    --
-    -- The last message in an openai delta will have:
-    --   choices[1].delta == {}
-    --   choices[1].finish_reason == 'stop'
-    --
-    local json_data = Utils:json_decode(string.sub(body, 7))
-    if
-      json_data ~= nil
-      and json_data.object == 'chat.completion.chunk'
-      and json_data.choices[1].delta.content ~= nil
-    then
-      return 'delta', json_data.choices[1].delta.content
-    end
-  else
-    return 'other', body
-  end
-  -- Not data, so most likely metadata that we only would want to see for
-  -- debugging purposes.
-  return 'cruft', body
-end
-
 ---Returns a table including the backend-specific implementation of the function run().
 ---
 ---@param API LLMAPI The API handler.
@@ -374,8 +214,6 @@ end
 ---@param backend_name string The name of the backend, as found in the user configuration.
 ---@return nil
 function M:M0backend(backend_name)
-  ---@type LLMAPI
-  local API = nil
   local msg = CurrentBuffer:new(self.Config)
   -- Use deepcopy to avoid cluttering the configuration with backend-specific settings.
   local backend_opts = vim.deepcopy(self.Config.backends[backend_name])
@@ -404,8 +242,8 @@ function M:M0backend(backend_name)
     vim.tbl_extend('force', default_opts, provider_opts, backend_opts)
 
   local APIHandlers = {
-    anthropic = Anthropic,
-    openai = OpenAI,
+    anthropic = M,
+    openai = M,
   }
 
   local APIHandler = APIHandlers[backend_opts.api_type]
@@ -415,7 +253,7 @@ function M:M0backend(backend_name)
   end
 
   ---@type LLMAPI
-  local API = APIHandler:new(backend_opts)
+  local API = APIFactory.create(backend_opts.api_type, backend_opts, M.State)
 
   M.State.backend = make_backend(API, msg, backend_opts)
 end
@@ -477,7 +315,7 @@ function M.setup(user_config)
     nargs = 1,
     complete = function()
       local ret = {}
-      for k, _ in pairs(self.Config.prompts) do
+      for k, _ in pairs(M.Config.prompts) do
         table.insert(ret, k)
       end
       table.sort(ret)
@@ -491,7 +329,7 @@ function M.setup(user_config)
     nargs = 1,
     complete = function()
       local ret = {}
-      for k, _ in pairs(self.Config.backends) do
+      for k, _ in pairs(M.Config.backends) do
         table.insert(ret, k)
       end
       table.sort(ret)
@@ -499,29 +337,7 @@ function M.setup(user_config)
     end,
   })
 
-  vim.api.nvim_create_user_command('M0chat', function()
-    M.M0chat()
-  end, { nargs = 0 })
-
-  ---Get a key fron pass.
-  ---@param name string the name of the key.
-  ---@return string key the key value.
-  function M:get_api_key(name)
-    if self.State.api_keys[name] == nil then
-      self.State.api_keys[name] =
-        vim.fn.system('echo -n $(pass ' .. name .. ')')
-    end
-    return self.State.api_keys[name]
-  end
-end
-
----Returns various debug information as a string.
----@return string
-function M:debug()
-  return 'State:\n'
-    .. vim.inspect(M.State)
-    .. '\nConfiguration: '
-    .. vim.inspect(self.Config)
+  vim.api.nvim_create_user_command('M0chat', M.M0chat, {})
 end
 
 return M

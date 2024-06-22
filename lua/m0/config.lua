@@ -2,11 +2,18 @@
 
 ---@class ProviderOptions
 ---@field api_type api_type
+---@field api_key? string
+---@field anthropic_version? string
 ---@field url string
----@field models table<string>?
+---@field models string[]
 ---@field max_tokens number
 ---@field stream boolean
 ---@field temperature number
+
+---@class Defaults
+---@field providers table<string, ProviderOptions>
+---@field default_backend_name string
+---@field default_prompt_name string
 
 ---@class BackendOptions:ProviderOptions
 ---@field provider string
@@ -19,11 +26,11 @@
 ---@class Config
 ---@field backends table<string,BackendOptions>
 ---@field providers table<string,ProviderOptions>
----@field defaults.providers table<string,ProviderOptions>
----@field defaults.default_backend_name string
----@field defaults.default_prompt_name string
----@field prompts table<string>
+---@field defaults Defaults
+---@field prompts string[]
 ---@field section_mark string
+
+---@type Config
 local M = {
   backends = {},
   providers = {},

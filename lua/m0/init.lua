@@ -103,15 +103,16 @@ function CurrentBuffer:get_messages()
   -- Assume the first message to be the user's.
   local role = 'user'
   local i = 1
+  -- Iterate through the conversation.
   while i <= #conversation do
-    -- Switch between roles when meeting a section mark in the conversation.
+    -- When meeting a section mark, switch roles.
     if conversation[i] == section_mark then
       -- Switch role.
       role = role == 'user' and 'assistant' or 'user'
       i = i + 1
     end
 
-    -- Build a message.
+    -- Build a message for the current role.
     local message = { role = role, content = '' }
     while i <= #conversation and conversation[i] ~= section_mark do
       message.content = message.content .. conversation[i] .. '\n'
@@ -310,7 +311,7 @@ end
 local function make_backend(API, msg, opts)
   return {
     opts = opts,
-    name = opts.backend_name,
+    -- name = opts.backend_name,
     run = function()
       local body = API:make_body()
 
@@ -377,6 +378,7 @@ function M:M0backend(backend_name)
   ---@type LLMAPI
   local API = nil
   local msg = CurrentBuffer:new(self.Config)
+  -- Use deepcopy to avoid cluttering the configuration with backend-specific settings.
   local backend_opts = vim.deepcopy(self.Config.backends[backend_name])
   local provider_name = backend_opts.provider
   local provider_opts = vim.deepcopy(self.Config.providers[provider_name])

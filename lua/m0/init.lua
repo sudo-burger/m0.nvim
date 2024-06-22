@@ -359,9 +359,9 @@ local function make_backend(API, msg, opts)
 
       -- The closing section mark is printed by the curl callbacks.
       msg:open_section()
-      local res = require('plenary.curl').post(opts.url, curl_opts)
-      if next(res._stderr_results) ~= nil then
-        Utils:log_error('API error (1): ' .. vim.inspect(res))
+      local response = require('plenary.curl').post(opts.url, curl_opts)
+      if response.status ~= nil and response.status ~= 200 then
+        Utils:log_error('API error (1): ' .. vim.inspect(response))
       end
     end,
   }

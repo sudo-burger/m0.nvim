@@ -1,3 +1,4 @@
+---@class Utils
 local M = {}
 
 function M:log_error(message)

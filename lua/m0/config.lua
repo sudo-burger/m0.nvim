@@ -1,15 +1,28 @@
----@class M0Config
-local M = {}
+---@alias api_type "anthropic" | "openai"
+
+---@class ProviderOptions
+---@field api_type api_type
+---@field url string
+---@field models table<string>?
+---@field max_tokens number
+---@field stream boolean
+---@field temperature number
+
+---@class BackendOptions:ProviderOptions
+---@field provider string
+---@field api_key string
+---@field model string
+---@field stream boolean?
+---@field max_tokens number?
+---@field temperature number?
 
 ---@class Config
----@field backends table<Backend>
----@field providers table
----@field default_backend_name string
----@field default_max_tokens integer
----@field default_prompt_name string
----@field default_stream boolean
----@field default_temperature number
----@field prompts table
+---@field backends table<string,BackendOptions>
+---@field providers table<string,ProviderOptions>
+---@field defaults.providers table<string,ProviderOptions>
+---@field defaults.default_backend_name string
+---@field defaults.default_prompt_name string
+---@field prompts table<string>
 ---@field section_mark string
 M = {
   backends = {},

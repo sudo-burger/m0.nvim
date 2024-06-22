@@ -1,26 +1,18 @@
----@alias api_type
----| '"anthropic"'
----| '"openai"'
-
----@alias delta_event
----| '"delta"' # the server sent a text delta
----| '"cruft"' # the server sent data we consider to be cruft
----| '"done"' # the server signaled that the text transfer is done.
----| '"other"' # we received something we cannot interpret.
+---@alias delta_event_type
+---| "delta" # the server sent a text delta
+---| "cruft" # the server sent data we consider to be cruft
+---| "done" # the server signaled that the text transfer is done.
+---| "other" # we received something we cannot interpret.
 
 ---Abstracts backend.
 ---@class Backend
----@field name string
----@field opts table
----@field api_type api_type The backend API type.
+---@field opts BackendOptions
 ---@field run fun(): nil
 
 ---@class State
----@field backend? Backend
----@field backend_name? string
----@field prompt? string
----@field prompt_name? string
----@field api_keys? table
+---@field backend Backend?
+---@field prompt string?
+---@field prompt_name string?
 
 -- Abstract class for message handlers.
 ---@class Message
@@ -33,23 +25,24 @@
 
 ---Abstract class for LLM APIs.
 ---@class LLMAPI
----@field opts table The API configuration.
+---@field opts BackendOptions
 ---@field make_body fun():table Makethe API request body.
 ---@field make_headers fun():table Make the API request headers.
----@field get_messages fun(messages:table):table? get the chat messages.
----@field get_response_text fun(data:string):string? Returns the text content of an API response.
+---@field get_messages fun(self:LLMAPI, messages:table):table<Message> get the chat messages.
+---@field get_response_text fun(self:LLMAPI, data:string):string? Returns the text content of an API response.
 ---Returns delta_event,data
 ---where
 ---  data: the delta text (for delta_event "delta"), or the http body for other events.
 ---@async
----@field get_delta_text? fun(LLMAPI:LLMAPI, body:string):delta_event,string
+---@field get_delta_text? fun(LLMAPI:LLMAPI, body:string):delta_event_type,string
 
+---@type Utils
 Utils = require 'm0.utils'
 
 local M = {
-  ---@class State
+  ---@type State
   State = {},
-  ---@class Config
+  ---@type Config
   Config = require 'm0.config',
 }
 
@@ -307,11 +300,11 @@ function OpenAI:get_delta_text(body)
   return 'cruft', body
 end
 
----Backend factory.
 ---Returns a table including the backend-specific implementation of the function run().
 ---
 ---@param API LLMAPI The API handler.
 ---@param msg Message The message handler.
+---@param opts BackendOptions
 ---@return Backend
 local function make_backend(API, msg, opts)
   return {
@@ -432,11 +425,12 @@ function M:M0prompt(prompt_name)
 end
 
 --- Run a chat round.
-function M.M0chat()
+---@return nil
+function M:M0chat()
   M.State.backend.run()
 end
 
----Returns various debug information as a string.
+---Returns printable debug information.
 ---@return string
 function M:debug()
   return 'State:\n'
@@ -447,6 +441,7 @@ end
 
 --- Sets up the m0 plugin.
 ---@param user_config table The user configuration.
+---@return nil
 function M.setup(user_config)
   M.Config = vim.tbl_extend('force', M.Config, user_config or {})
   if M.Config.backends[M.Config.default_backend_name] == nil then

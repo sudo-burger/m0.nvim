@@ -352,7 +352,6 @@ local function make_backend(API, msg, opts)
         curl_opts.callback = vim.schedule_wrap(function(out)
           -- Build the reply in the message handler.
           local res = API:get_response_text(out.body)
-          vim.notify('Got (2): ' .. vim.inspect(res))
           msg:set_last_line(res)
           msg:close_section()
         end)

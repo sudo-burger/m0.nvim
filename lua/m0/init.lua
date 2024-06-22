@@ -45,6 +45,7 @@ local M = {
   ---@type Config
   Config = require 'm0.config',
 }
+M.__index = M
 
 ---@class Message
 Message = {}

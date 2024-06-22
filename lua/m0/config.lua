@@ -24,7 +24,7 @@
 ---@field defaults.default_prompt_name string
 ---@field prompts table<string>
 ---@field section_mark string
-M = {
+local M = {
   backends = {},
   providers = {},
   defaults = {

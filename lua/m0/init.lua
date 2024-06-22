@@ -403,14 +403,19 @@ function M:M0backend(backend_name)
   backend_opts =
     vim.tbl_extend('force', default_opts, provider_opts, backend_opts)
 
+  local APIHandlers = {
+    anthropic = Anthropic,
+    openai = OpenAI,
+  }
+
+  local APIHandler = APIHandlers[backend_opts.api_type]
   -- Backend type handlers.
-  if backend_opts.api_type == 'anthropic' then
-    API = Anthropic:new(backend_opts)
-  elseif backend_opts.api_type == 'openai' then
-    API = OpenAI:new(backend_opts)
-  else
+  if not APIHandler then
     error('Invalid backend API type: ' .. (backend_opts.api_type or 'nil'))
   end
+
+  ---@type LLMAPI
+  local API = APIHandler:new(backend_opts)
 
   M.State.backend = make_backend(API, msg, backend_opts)
 end

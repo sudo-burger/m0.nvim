@@ -1,64 +1,6 @@
 ---@diagnostic disable: undefined-global, undefined-field
 M0 = require 'm0'
 
--- Invalid prompt.
-Opts = {
-  providers = {
-    ['openai'] = {
-      api_key = 'xxx',
-    },
-  },
-  backends = {
-    ['openai:gpt-3.5-turbo'] = {
-      provider = 'openai',
-      model = 'gpt-3.5-turbo',
-      stream = true,
-    },
-  },
-  default_backend_name = 'openai:gpt-3.5-turbo',
-  prompts = {
-    ['Charles Bukowski'] = 'You are now Charles Bukowski.',
-  },
-  default_prompt_name = 'Marilyn Monroe',
-}
-
-describe('m0', function()
-  it('setup fails if the default prompt does not exist', function()
-    assert.has.errors(function()
-      M0.setup(Opts)
-    end)
-  end)
-end)
-
--- Invalid backend.
-Opts = {
-  providers = {
-    ['openai'] = {
-      api_key = 'xxx',
-    },
-  },
-  backends = {
-    ['openai:gpt-3.5-turbo'] = {
-      provider = 'openai',
-      model = 'gpt-3.5-turbo',
-      stream = true,
-    },
-  },
-  default_backend_name = 'xxx',
-  prompts = {
-    ['Charles Bukowski'] = 'You are now Charles Bukowski.',
-  },
-  default_prompt_name = 'Charles Bukowski',
-}
-
-describe('m0', function()
-  it('setup fails if the default backend does not exist', function()
-    assert.has.errors(function()
-      M0.setup(Opts)
-    end)
-  end)
-end)
-
 -- Valid configuration.
 Opts = {
   providers = {
@@ -184,7 +126,7 @@ end)
 describe('m0', function()
   it(
     'can change the prompt when the backend is '
-      .. vim.inspect(M0.State.backend.opts.type),
+      .. vim.inspect(M0.State.backend.opts.api_type),
     function()
       local new_prompt_name = 'Charles Bukowski'
       local expected = Opts.prompts[new_prompt_name]
@@ -196,10 +138,10 @@ describe('m0', function()
       )
     end
   )
-  M0:M0backend 'anthropic:claude-3-haiku'
+  M0:M0backend 'openai:gpt-3.5-turbo'
   it(
     'can change the prompt when the backend is '
-      .. vim.inspect(M0.State.backend.opts.type),
+      .. vim.inspect(M0.State.backend.opts.api_type),
     function()
       local new_prompt_name = 'Marilyn Monroe'
       local expected = Opts.prompts[new_prompt_name]
@@ -211,4 +153,186 @@ describe('m0', function()
       )
     end
   )
+end)
+
+-- local mock = require 'luassert.mock'
+local stub = require 'luassert.stub'
+
+describe('m0', function()
+  local m0, config, api_factory, anthropic, openai, utils, vim_buffer
+
+  before_each(function()
+    m0 = require 'm0'
+    config = require 'm0.config'
+    api_factory = require 'm0.apifactory'
+    anthropic = require 'm0.anthropic'
+    openai = require 'm0.openai'
+    utils = require 'm0.utils'
+    vim_buffer = require 'm0.vimbuffer'
+  end)
+
+  describe('APIFactory', function()
+    it('should create an Anthropic API handler', function()
+      local api = api_factory.create('anthropic', {}, {})
+      assert.truthy(api)
+      assert.are.equal(getmetatable(api).__index, anthropic)
+    end)
+
+    it('should create an OpenAI API handler', function()
+      local api = api_factory.create('openai', {}, {})
+      assert.truthy(api)
+      assert.are.equal(getmetatable(api).__index, openai)
+    end)
+
+    it('should throw an error for unsupported API type', function()
+      assert.has.error(function()
+        api_factory.create('unsupported', {}, {})
+      end, 'Unsupported API type: unsupported')
+    end)
+  end)
+
+  describe('Anthropic', function()
+    local api
+
+    before_each(function()
+      api = anthropic:new({
+        model = 'claude-3-opus-20240229',
+        temperature = 0.7,
+        max_tokens = 100,
+        stream = false,
+        api_key = 'test_key',
+        anthropic_version = '2023-06-01',
+      }, { prompt = 'Test prompt' })
+    end)
+
+    it('should create a valid body', function()
+      local body = api:make_body()
+      assert.are.same({
+        model = 'claude-3-opus-20240229',
+        temperature = 0.7,
+        max_tokens = 100,
+        stream = false,
+        system = 'Test prompt',
+      }, body)
+    end)
+
+    it('should create valid headers', function()
+      local headers = api:make_headers()
+      assert.are.same({
+        content_type = 'application/json',
+        x_api_key = 'test_key',
+        anthropic_version = '2023-06-01',
+      }, headers)
+    end)
+
+    it('should format messages correctly', function()
+      local raw_messages = { 'Hello', 'Hi there', 'How are you?' }
+      local formatted = api:get_messages(raw_messages)
+      assert.are.same({
+        { role = 'user', content = 'Hello' },
+        { role = 'assistant', content = 'Hi there' },
+        { role = 'user', content = 'How are you?' },
+      }, formatted)
+    end)
+  end)
+
+  describe('OpenAI', function()
+    local api
+
+    before_each(function()
+      api = openai:new({
+        model = 'gpt-4',
+        temperature = 0.7,
+        max_tokens = 100,
+        stream = false,
+        api_key = 'test_key',
+      }, { prompt = 'Test prompt' })
+    end)
+
+    it('should create a valid body', function()
+      local body = api:make_body()
+      assert.are.same({
+        model = 'gpt-4',
+        temperature = 0.7,
+        max_tokens = 100,
+        stream = false,
+      }, body)
+    end)
+
+    it('should create valid headers', function()
+      local headers = api:make_headers()
+      assert.are.same({
+        content_type = 'application/json',
+        authorization = 'Bearer test_key',
+      }, headers)
+    end)
+
+    it('should format messages correctly', function()
+      local raw_messages = { 'Hello', 'Hi there', 'How are you?' }
+      local formatted = api:get_messages(raw_messages)
+      assert.are.same({
+        { role = 'system', content = 'Test prompt' },
+        { role = 'user', content = 'Hello' },
+        { role = 'assistant', content = 'Hi there' },
+        { role = 'user', content = 'How are you?' },
+      }, formatted)
+    end)
+  end)
+
+  describe('VimBuffer', function()
+    local buffer
+
+    before_each(function()
+      buffer = vim_buffer:new { section_mark = '-------' }
+      stub(vim.api, 'nvim_get_current_buf')
+      stub(vim.api, 'nvim_buf_get_lines')
+      stub(vim.api, 'nvim_buf_set_lines')
+    end)
+
+    after_each(function()
+      vim.api.nvim_get_current_buf:revert()
+      vim.api.nvim_buf_get_lines:revert()
+      vim.api.nvim_buf_set_lines:revert()
+    end)
+
+    it('should get messages from buffer', function()
+      vim.api.nvim_get_current_buf.returns(1)
+      vim.api.nvim_buf_get_lines.returns {
+        'User: Hello',
+        '-------',
+        'AI: Hi there',
+        '-------',
+        'User: How are you?',
+        '-------',
+      }
+
+      local messages = buffer:get_messages()
+      assert.are.same({
+        'User: Hello\n',
+        'AI: Hi there\n',
+        'User: How are you?\n',
+      }, messages)
+    end)
+  end)
+
+  describe('setup', function()
+    it('should throw an error for invalid default backend', function()
+      assert.has_error(function()
+        m0.setup {
+          backends = { ['a'] = {} },
+          default_backend_name = 'invalid_backend',
+        }
+      end, 'Default backend (invalid_backend) not in configuration.')
+    end)
+    it('should throw an error for invalid default prompt', function()
+      assert.has_error(function()
+        m0.setup {
+          backends = { ['a'] = {} },
+          default_backend_name = 'a',
+          prompts = { ['a'] = {} },
+          default_prompt_name = 'invalid_prompt',
+        }
+      end, 'Default prompt (invalid_prompt) not in configuration.')
+    end)
+  end)
 end)

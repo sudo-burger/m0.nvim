@@ -34,7 +34,7 @@ end
 function M:make_headers()
   return {
     content_type = 'application/json',
-    authorization = 'Bearer ' .. self.opts.api_key,
+    authorization = 'Bearer ' .. self.opts.api_key(),
   }
 end
 

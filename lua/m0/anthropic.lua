@@ -36,7 +36,7 @@ end
 function M:make_headers()
   return {
     content_type = 'application/json',
-    x_api_key = self.opts.api_key,
+    x_api_key = self.opts.api_key(),
     anthropic_version = self.opts.anthropic_version,
   }
 end

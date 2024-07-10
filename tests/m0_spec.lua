@@ -1,14 +1,18 @@
 ---@diagnostic disable: undefined-global, undefined-field
 M0 = require 'm0'
 
+local function make_api_key()
+  return 'dummy_key'
+end
+
 -- Valid configuration.
 Opts = {
   providers = {
     ['openai'] = {
-      api_key = 'xxx',
+      api_key = make_api_key,
     },
     ['anthropic'] = {
-      api_key = 'xxx',
+      api_key = make_api_key,
     },
   },
   backends = {
@@ -200,7 +204,7 @@ describe('m0', function()
         temperature = 0.7,
         max_tokens = 100,
         stream = false,
-        api_key = 'test_key',
+        api_key = make_api_key,
         anthropic_version = '2023-06-01',
       }, { prompt = 'Test prompt' })
     end)
@@ -220,7 +224,7 @@ describe('m0', function()
       local headers = api:make_headers()
       assert.are.same({
         content_type = 'application/json',
-        x_api_key = 'test_key',
+        x_api_key = make_api_key(),
         anthropic_version = '2023-06-01',
       }, headers)
     end)
@@ -245,7 +249,7 @@ describe('m0', function()
         temperature = 0.7,
         max_tokens = 100,
         stream = false,
-        api_key = 'test_key',
+        api_key = make_api_key,
       }, { prompt = 'Test prompt' })
     end)
 
@@ -263,7 +267,7 @@ describe('m0', function()
       local headers = api:make_headers()
       assert.are.same({
         content_type = 'application/json',
-        authorization = 'Bearer test_key',
+        authorization = 'Bearer dummy_key',
       }, headers)
     end)
 

@@ -197,7 +197,9 @@ function M.setup(user_config)
     end
     table.sort(items)
     vim.ui.select(items, {}, function(choice)
-      M:M0prompt(choice)
+      if choice then
+        M:M0prompt(choice)
+      end
     end)
   end, { nargs = 0 })
 
@@ -208,7 +210,9 @@ function M.setup(user_config)
     end
     table.sort(items)
     vim.ui.select(items, {}, function(choice)
-      M:M0backend(choice)
+      if choice then
+        M:M0backend(choice)
+      end
     end)
   end, { nargs = 0 })
 

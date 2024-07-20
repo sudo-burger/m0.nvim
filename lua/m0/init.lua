@@ -64,6 +64,9 @@ local function make_backend(API, msg, opts)
           elseif event == 'done' then
             msg:close_section()
           else
+            -- Utils:log_info(
+            --   'Other stream results (1): [' .. event .. '][' .. d .. ']'
+            -- )
             -- Cruft or no data.
             return
           end
@@ -187,33 +190,27 @@ function M.setup(user_config)
   -- User commands
   -- -------------
 
-  vim.api.nvim_create_user_command('M0prompt', function(opts)
-    M:M0prompt(opts.args)
-  end, {
-    nargs = 1,
-    complete = function()
-      local ret = {}
-      for k, _ in pairs(M.Config.prompts) do
-        table.insert(ret, k)
-      end
-      table.sort(ret)
-      return ret
-    end,
-  })
+  vim.api.nvim_create_user_command('M0prompt', function(_)
+    local items = {}
+    for k, _ in pairs(M.Config.prompts) do
+      table.insert(items, k)
+    end
+    table.sort(items)
+    vim.ui.select(items, {}, function(choice)
+      M:M0prompt(choice)
+    end)
+  end, { nargs = 0 })
 
-  vim.api.nvim_create_user_command('M0backend', function(opts)
-    M:M0backend(opts.args)
-  end, {
-    nargs = 1,
-    complete = function()
-      local ret = {}
-      for k, _ in pairs(M.Config.backends) do
-        table.insert(ret, k)
-      end
-      table.sort(ret)
-      return ret
-    end,
-  })
+  vim.api.nvim_create_user_command('M0backend', function(_)
+    local items = {}
+    for k, _ in pairs(M.Config.backends) do
+      table.insert(items, k)
+    end
+    table.sort(items)
+    vim.ui.select(items, {}, function(choice)
+      M:M0backend(choice)
+    end)
+  end, { nargs = 0 })
 
   vim.api.nvim_create_user_command('M0chat', M.M0chat, {})
 end

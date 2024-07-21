@@ -54,6 +54,7 @@ local M = {
         url = 'https://api.openai.com/v1/chat/completions',
         models = {
           'gpt-4o',
+          'gpt-4o-mini',
         },
         max_tokens = 128,
         stream = false,

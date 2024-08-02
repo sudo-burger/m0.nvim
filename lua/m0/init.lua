@@ -187,6 +187,8 @@ function M.setup(user_config)
   M:M0prompt(M.Config.default_prompt_name)
   M:M0backend(M.Config.default_backend_name)
 
+  vim.keymap.set({ 'n', 'v' }, '<Plug>(M0chat)', M.M0chat, { noremap = true })
+
   -- User commands
   -- See: https://github.com/nvim-neorocks/nvim-best-practices?tab=readme-ov-file
   -- -------------

@@ -140,7 +140,7 @@ function M:M0backend(backend_name)
 end
 
 ---Select prompt interactively.
----@param prompt_name string
+---@param prompt_name string The name of the prompt, as found in the user configuration.
 ---@return nil
 function M:M0prompt(prompt_name)
   if self.Config.prompts[prompt_name] == nil then

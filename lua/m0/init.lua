@@ -188,35 +188,95 @@ function M.setup(user_config)
   M:M0backend(M.Config.default_backend_name)
 
   -- User commands
+  -- See: https://github.com/nvim-neorocks/nvim-best-practices?tab=readme-ov-file
   -- -------------
+  ---@class M0Subcommand
+  ---@field impl fun(args:string[], opts: table) The command implementation
+  ---@field complete? fun(subcmd_arg_lead: string): string[] (optional) Command completions callback, taking the lead of the subcommand's arguments
 
-  vim.api.nvim_create_user_command('M0prompt', function(_)
-    local items = {}
-    for k, _ in pairs(M.Config.prompts) do
-      table.insert(items, k)
+  ---@type table<string, M0Subcommand>
+  local subcommand_tbl = {
+    chat = {
+      impl = M.M0chat,
+    },
+    backend = {
+      impl = function(_, _)
+        local items = {}
+        for k, _ in pairs(M.Config.backends) do
+          table.insert(items, k)
+        end
+        table.sort(items)
+        vim.ui.select(items, {}, function(choice)
+          if choice then
+            M:M0backend(choice)
+          end
+        end)
+      end,
+    },
+    prompt = {
+      impl = function(_, _)
+        local items = {}
+        for k, _ in pairs(M.Config.prompts) do
+          table.insert(items, k)
+        end
+        table.sort(items)
+        vim.ui.select(items, {}, function(choice)
+          if choice then
+            M:M0prompt(choice)
+          end
+        end)
+      end,
+    },
+  }
+
+  ---@param opts table :h lua-guide-commands-create
+  local function M0(opts)
+    local fargs = opts.fargs
+    local subcommand_key = fargs[1]
+    -- Get the subcommand's args, if any.
+    local args = #fargs > 1 and vim.list_slice(fargs, 2, #fargs) or {}
+    local subcommand = subcommand_tbl[subcommand_key]
+    if not subcommand then
+      vim.notify(
+        'M0: unknown command: ' .. subcommand_key,
+        vim.log.levels.ERROR
+      )
+      return
     end
-    table.sort(items)
-    vim.ui.select(items, {}, function(choice)
-      if choice then
-        M:M0prompt(choice)
-      end
-    end)
-  end, { nargs = 0 })
+    -- Invoke the subcommand.
+    subcommand.impl(args, opts)
+  end
 
-  vim.api.nvim_create_user_command('M0backend', function(_)
-    local items = {}
-    for k, _ in pairs(M.Config.backends) do
-      table.insert(items, k)
-    end
-    table.sort(items)
-    vim.ui.select(items, {}, function(choice)
-      if choice then
-        M:M0backend(choice)
+  vim.api.nvim_create_user_command('M0', M0, {
+    nargs = '+',
+    desc = 'M0 command and subcommands',
+    complete = function(arg_lead, cmdline, _)
+      -- Get the subcommand.
+      local subcmd_key, subcmd_arg_lead =
+        cmdline:match "^['<,'>]*M0[!]*%s(%S+)%s(.*)$"
+      if
+        subcmd_key
+        and subcmd_arg_lead
+        and subcommand_tbl[subcmd_key]
+        and subcommand_tbl[subcmd_key].complete
+      then
+        -- The subcommand has completions. Return them.
+        return subcommand_tbl[subcmd_key].complete(subcmd_arg_lead)
       end
-    end)
-  end, { nargs = 0 })
-
-  vim.api.nvim_create_user_command('M0chat', M.M0chat, {})
+      -- Check if cmdline is a subcommand
+      if cmdline:match "^['<,'>]*M0[!]*%s+%w*$" then
+        -- Filter subcommands that match
+        local subcommand_keys = vim.tbl_keys(subcommand_tbl)
+        return vim
+          .iter(subcommand_keys)
+          :filter(function(key)
+            return key:find(arg_lead) ~= nil
+          end)
+          :totable()
+      end
+    end,
+    bang = true, -- If you want to support ! modifiers
+  })
 end
 
 return M

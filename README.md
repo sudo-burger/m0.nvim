@@ -16,13 +16,13 @@ Currently supported APIs:
 See the example Lazy configuration in `examples/m0.lua`.
 
 ## Usage
-Call M0chat to send the contents of the current buffer.
+Call M0 chat to send the contents of the current buffer.
 Sections surrounded by a "section mark" ('-------' by default) will be
 interpreted as assistant answers.
 
-Call M0backend to change backend.
+Call M0 backend to change backend.
 
-Call M0prompt to change prompt.
+Call M0 prompt to change prompt.
 
 ## Similar Projects
 

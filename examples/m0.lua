@@ -98,7 +98,7 @@ return {
     vim.keymap.set(
       { 'n', 'v' },
       '<leader>ax',
-      require('m0').M0chat,
+      '<Plug>(M0chat)',
       { desc = 'M0chat' }
     )
   end,

@@ -1,4 +1,4 @@
----@class APIFactory
+---@class M0.APIFactory
 local M = {}
 
 local Anthropic = require 'm0.anthropic'
@@ -11,9 +11,9 @@ local APIHandlers = {
 }
 
 ---@param api_type api_type
----@param opts BackendOptions
+---@param opts M0.BackendOptions
 ---@param state table reference to current state.
----@return LLMAPI?
+---@return M0.LLMAPI?
 function M.create(api_type, opts, state)
   local APIHandler = APIHandlers[api_type]
   if not APIHandler then

@@ -1,25 +1,25 @@
 require 'm0.message'
 
----@class VimBuffer
----@field opts Config | nil
+---@class M0.VimBuffer
+---@field opts M0.Config | nil
 ---@field buf_id integer | nil
----@field new? fun(self:VimBuffer, opts:table):VimBuffer
----@field get_visual_selection? fun(self:VimBuffer):string[]
----@field get_messages? fun(self:VimBuffer):RawMessage[]
----@field append_lines? fun(self:VimBuffer, lines:string[])
----@field get_last_line? fun(self:VimBuffer):string
----@field set_last_line? fun(self:VimBuffer, txt:string)
----@field open_section? fun(self:VimBuffer)
----@field close_section? fun(self:VimBuffer)
+---@field new? fun(self:M0.VimBuffer, opts:table):M0.VimBuffer
+---@field get_visual_selection? fun(self:M0.VimBuffer):string[]
+---@field get_messages? fun(self:M0.VimBuffer):RawMessage[]
+---@field append_lines? fun(self:M0.VimBuffer, lines:string[])
+---@field get_last_line? fun(self:M0.VimBuffer):string
+---@field set_last_line? fun(self:M0.VimBuffer, txt:string)
+---@field open_section? fun(self:M0.VimBuffer)
+---@field close_section? fun(self:M0.VimBuffer)
 
----@type VimBuffer
+---@type M0.VimBuffer
 local M = {
   opts = nil,
   buf_id = nil,
 }
 
----@param opts Config The current configuration
----@return VimBuffer
+---@param opts M0.Config The current configuration
+---@return M0.VimBuffer
 function M:new(opts)
   return setmetatable(
     { buf_id = vim.api.nvim_get_current_buf(), opts = opts },

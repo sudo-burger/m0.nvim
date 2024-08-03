@@ -3,17 +3,17 @@ require 'm0.message'
 local LLMAPI = require 'm0.llmapi'
 local Utils = require 'm0.utils'
 
----@class OpenAIMessage
+---@class M0.OpenAIMessage
 ---@field role string
 ---@field content string
 
----@class OpenAI :LLMAPI
----@field new fun(self:LLMAPI, backend_opts:BackendOptions, state: table):LLMAPI
----@field get_messages fun(self:OpenAI, messages:RawMessage[]):OpenAIMessage[]
+---@class M0.OpenAI :M0.LLMAPI
+---@field new fun(self:M0.LLMAPI, backend_opts:M0.BackendOptions, state: table):M0.LLMAPI
+---@field get_messages fun(self:M0.OpenAI, messages:RawMessage[]):M0.OpenAIMessage[]
 ---@field opts table
 ---@field state table
 
----@type OpenAI
+---@type M0.OpenAI
 local M = {}
 function M:new(opts, state)
   return setmetatable(
@@ -39,7 +39,7 @@ function M:make_headers()
 end
 
 function M:get_messages(raw_messages)
-  ---@type OpenAIMessage[]
+  ---@type M0.OpenAIMessage[]
   local messages = {}
   local role = 'user'
   local i = 1

@@ -3,17 +3,17 @@ require 'm0.message'
 local LLMAPI = require 'm0.llmapi'
 local Utils = require 'm0.utils'
 
----@class AnthropicMessage
+---@class M0.AnthropicMessage
 ---@field role string
 ---@field content string
 
----@class Anthropic:LLMAPI
----@field new fun(self:LLMAPI, backend_opts:BackendOptions, state: table):LLMAPI
----@field get_messages fun(self:Anthropic, messages:RawMessage[]):AnthropicMessage[]
+---@class M0.Anthropic:M0.LLMAPI
+---@field new fun(self:M0.LLMAPI, backend_opts:M0.BackendOptions, state: table):M0.LLMAPI
+---@field get_messages fun(self:M0.Anthropic, messages:RawMessage[]):M0.AnthropicMessage[]
 ---@field opts table
 ---@field state table
 
----@type Anthropic
+---@type M0.Anthropic
 local M = {}
 
 function M:new(opts, state)
@@ -42,7 +42,7 @@ function M:make_headers()
 end
 
 function M:get_messages(raw_messages)
-  ---@type AnthropicMessage[]
+  ---@type M0.AnthropicMessage[]
   local messages = {}
   local role = 'user'
   local i = 1

@@ -1,5 +1,5 @@
 ---@class Backend
----@field opts BackendOptions
+---@field opts M0.BackendOptions
 ---@field run fun(): nil
 
 ---@class State
@@ -7,28 +7,28 @@
 ---@field prompt string?
 ---@field prompt_name string?
 
----@type APIFactory
+---@type M0.APIFactory
 local APIFactory = require 'm0.apifactory'
 
----@type Utils
+---@type M0.Utils
 local Utils = require 'm0.utils'
 
 local M = {
   ---@type State
   State = {},
-  ---@type Config
+  ---@type M0.Config
   Config = require 'm0.config',
 }
 M.__index = M
 
----@type VimBuffer
+---@type M0.VimBuffer
 local VimBuffer = require 'm0.vimbuffer'
 
 ---Returns a table including the backend-specific implementation of the function run().
 ---
----@param API LLMAPI The API handler.
----@param msg VimBuffer
----@param opts BackendOptions
+---@param API M0.LLMAPI The API handler.
+---@param msg M0.VimBuffer
+---@param opts M0.BackendOptions
 ---@return Backend
 local function make_backend(API, msg, opts)
   return {
@@ -129,7 +129,7 @@ function M:M0backend(backend_name)
   backend_opts =
     vim.tbl_extend('force', default_opts, provider_opts, backend_opts)
 
-  ---@type LLMAPI?
+  ---@type M0.LLMAPI?
   local API = APIFactory.create(backend_opts.api_type, backend_opts, M.State)
   if not API then
     Utils:log_error('Unable create API for ' .. backend_opts.api_type)

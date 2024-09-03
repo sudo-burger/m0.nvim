@@ -188,22 +188,22 @@ function M.setup(user_config)
   M:M0backend(M.Config.default_backend_name)
 
   vim.keymap.set(
-    { 'n', 'v' },
+    { 'n' },
     '<Plug>(M0 backend)',
     ':M0 backend<CR>',
-    { noremap = true }
+    { noremap = true, silent = true }
   )
   vim.keymap.set(
     { 'n', 'v' },
     '<Plug>(M0 chat)',
-    ':M0 chat<CR>',
-    { noremap = true }
+    M.M0chat,
+    { noremap = true, silent = true }
   )
   vim.keymap.set(
-    { 'n', 'v' },
+    { 'n' },
     '<Plug>(M0 prompt)',
     ':M0 prompt<CR>',
-    { noremap = true }
+    { noremap = true, silent = true }
   )
 
   -- User commands

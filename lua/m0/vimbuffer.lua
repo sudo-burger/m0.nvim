@@ -28,6 +28,7 @@ function M:new(opts)
 end
 
 ---Get the currently selected text.
+---@return string[]
 function M:get_visual_selection()
   local sline = vim.fn.line 'v'
   local eline = vim.fn.line '.'
@@ -40,11 +41,12 @@ function M:get_visual_selection()
 end
 
 --- Get messages from current buffer.
---- Transform the chat text into a list of 'messages',
---- with format: [{ role = <user|assistant>, content = <str> }].
---- This is the format used by the OpenAI and Anthropic APIs.
+--- Transform the chat text into a list of 'messages'.
+--- Every section mark is interpreted as the start of a new message.
+---@return RawMessage[]
 function M:get_messages()
   self.buf_id = vim.api.nvim_get_current_buf()
+  ---@type RawMessage[]
   local messages = {}
   local section_mark = self.opts.section_mark
   local conversation = nil
@@ -75,14 +77,20 @@ function M:get_messages()
   return messages
 end
 
+--- Append lines to the end of the buffer.
+---@param lines string[]
 function M:append_lines(lines)
   vim.api.nvim_buf_set_lines(self.buf_id, -1, -1, false, lines)
 end
 
+--- Get the last line of the buffer.
+---@return string
 function M:get_last_line()
   return table.concat(vim.api.nvim_buf_get_lines(self.buf_id, -2, -1, false))
 end
 
+--- Replace the last line of the buffer with the given text.
+---@param txt string
 function M:set_last_line(txt)
   vim.api.nvim_buf_set_lines(
     self.buf_id,
@@ -95,11 +103,14 @@ function M:set_last_line(txt)
   )
 end
 
+--- Open/close a chat sections.
+--- FIX: the same action is take to open/close sections at the moment. We may want to differntiate the markers.
 function M:open_section()
+  -- Append a section mark.
   self:append_lines { self.opts.section_mark, '' }
 end
-
 function M:close_section()
+  -- Append a section mark.
   self:append_lines { self.opts.section_mark, '' }
 end
 

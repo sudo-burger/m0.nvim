@@ -26,7 +26,7 @@ return {
   dependencies = {
     'nvim-lua/plenary.nvim',
   },
-  event = 'VeryLazy',
+  cmd = { 'M0' },
   config = function()
     require('m0').setup {
       providers = {

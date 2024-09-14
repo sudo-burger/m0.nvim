@@ -6,7 +6,8 @@
 ---@field backend Backend?
 ---@field prompt string?
 ---@field prompt_name string?
----@field context string?
+---@field scan_project boolean?
+---@field project_context string?
 
 ---@type M0.APIFactory
 local APIFactory = require 'm0.apifactory'
@@ -42,9 +43,11 @@ local function make_backend(API, msg, opts, state)
     run = function()
       local messages = msg:get_messages()
 
-      -- If a context exists, prepend it.
-      if state.context then
-        table.insert(messages, 1, state.context)
+      -- If a scan of the project has been requested, it should make sense
+      -- to refresh it on every run.
+      if state.scan_project == true then
+        M.State.project_context = ScanProject:get_context '.'
+        table.insert(messages, 1, M.State.project_context)
       end
 
       local body = API:make_body()
@@ -169,7 +172,7 @@ end
 --- Scan the project code.
 --- @return nil
 function M.M0scan_project()
-  M.State.context = ScanProject:get_context '.'
+  M.State.scan_project = true
 end
 
 ---Returns printable debug information.

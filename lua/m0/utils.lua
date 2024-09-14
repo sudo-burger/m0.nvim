@@ -5,6 +5,7 @@
 ---@field json_decode fun(self:M0.Utils, data: any):any
 
 ---@type M0.Utils
+---@diagnostic disable-next-line: missing-fields
 local M = {}
 
 function M:log_error(message)

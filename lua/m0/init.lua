@@ -6,12 +6,16 @@
 ---@field backend Backend?
 ---@field prompt string?
 ---@field prompt_name string?
+---@field context string?
 
 ---@type M0.APIFactory
 local APIFactory = require 'm0.apifactory'
 
 ---@type M0.Utils
 local Utils = require 'm0.utils'
+
+---@type M0.ScanProject
+local ScanProject = require 'm0.scanproject'
 
 local M = {
   ---@type State
@@ -29,16 +33,22 @@ local VimBuffer = require 'm0.vimbuffer'
 ---@param API M0.LLMAPI The API handler.
 ---@param msg M0.VimBuffer
 ---@param opts M0.BackendOptions
+---@param state State
 ---@return Backend
-local function make_backend(API, msg, opts)
+local function make_backend(API, msg, opts, state)
   return {
     opts = opts,
     -- name = opts.backend_name,
     run = function()
-      local body = API:make_body()
+      local messages = msg:get_messages()
 
-      -- Message are specific to each run.
-      body.messages = API:get_messages(msg:get_messages())
+      -- If a context exists, prepend it.
+      if state.context then
+        table.insert(messages, 1, state.context)
+      end
+
+      local body = API:make_body()
+      body.messages = API:get_messages(messages)
 
       local curl_opts = {
         headers = API:make_headers(),
@@ -136,7 +146,7 @@ function M:M0backend(backend_name)
     return
   end
 
-  M.State.backend = make_backend(API, msg, backend_opts)
+  M.State.backend = make_backend(API, msg, backend_opts, M.State)
 end
 
 ---Select prompt interactively.
@@ -154,6 +164,12 @@ end
 ---@return nil
 function M:M0chat()
   M.State.backend.run()
+end
+
+--- Scan the project code.
+--- @return nil
+function M.M0scan_project()
+  M.State.context = ScanProject:get_context '.'
 end
 
 ---Returns printable debug information.
@@ -205,6 +221,12 @@ function M.setup(user_config)
     ':M0 prompt<CR>',
     { noremap = true, silent = true }
   )
+  vim.keymap.set(
+    { 'n' },
+    '<Plug>(M0 scan_project)',
+    ':M0 scan-project<CR>',
+    { noremap = true, silent = true }
+  )
 
   -- User commands
   -- See: https://github.com/nvim-neorocks/nvim-best-practices?tab=readme-ov-file
@@ -215,9 +237,6 @@ function M.setup(user_config)
 
   ---@type table<string, M0Subcommand>
   local subcommand_tbl = {
-    chat = {
-      impl = M.M0chat,
-    },
     backend = {
       impl = function(_, _)
         local items = {}
@@ -232,6 +251,9 @@ function M.setup(user_config)
         end)
       end,
     },
+    chat = {
+      impl = M.M0chat,
+    },
     prompt = {
       impl = function(_, _)
         local items = {}
@@ -245,6 +267,9 @@ function M.setup(user_config)
           end
         end)
       end,
+    },
+    scan_project = {
+      impl = M.M0scan_project,
     },
   }
 

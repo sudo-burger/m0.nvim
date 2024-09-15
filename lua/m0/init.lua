@@ -169,12 +169,6 @@ function M:M0chat()
   M.State.backend.run()
 end
 
---- Scan the project code.
---- @return nil
-function M.M0scan_project()
-  M.State.scan_project = true
-end
-
 ---Returns printable debug information.
 ---@return string
 function M:debug()
@@ -272,7 +266,26 @@ function M.setup(user_config)
       end,
     },
     scan_project = {
-      impl = M.M0scan_project,
+      impl = function(_, _)
+        local current = ''
+        if M.State.scan_project == true then
+          current = 'on'
+        else
+          current = 'off'
+        end
+        vim.ui.select(
+          { 'on', 'off' },
+          { prompt = 'Current: ' .. current },
+          function(choice)
+            if choice == 'on' then
+              M.State.scan_project = true
+            elseif choice == 'off' then
+              M.State.scan_project = false
+              M.State.project_context = nil
+            end
+          end
+        )
+      end,
     },
   }
 

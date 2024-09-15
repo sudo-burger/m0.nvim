@@ -16,7 +16,9 @@ Currently supported APIs:
 See the example Lazy configuration in `examples/m0.lua`.
 
 ## Usage
-":M0 chat" sends the contents of the current buffer.
+
+":M0 chat" initiate conversation.
+":M0 scan_project" include the current project as conversation context.
 ":M0 backend" to select a backend.
 ":M0 prompt" to select a prompt.
 

@@ -14,10 +14,17 @@ local function read_file(path)
   return contents
 end
 
+--- Create a 'project context' (in practice a concatenation of the project files.)
+---@param dir string The directory where the project lives.
+---@return string The 'context'
 function M:get_context(dir)
-  ---@type table
+  --- Refuse to continue if 'dir' is not a .git repository.
+  if require('plenary.path'):new(dir .. '/.git'):is_dir() == false then
+    require('m0.utils'):log_info('Not .git in ' .. dir .. '; refusing to scan.')
+    return ''
+  end
+  ---@type string[]
   local files = require('plenary.scandir').scan_dir(dir)
-  ---@type string
   local context = [[The following is the context for this project.
   The context is composed of zero or more files.
   The contexts of each file are given here, bracketed by the string "__BEGIN_FILE "

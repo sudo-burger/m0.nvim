@@ -46,7 +46,7 @@ local function make_backend(API, msg, opts, state)
       -- If a scan of the project has been requested, it should make sense
       -- to refresh it on every run.
       if state.scan_project == true then
-        M.State.project_context = ScanProject:get_context '.'
+        M.State.project_context = ScanProject:get_context(vim.fn.getcwd())
         table.insert(messages, 1, M.State.project_context)
       end
 

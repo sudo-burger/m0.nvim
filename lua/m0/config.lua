@@ -29,6 +29,8 @@
 ---@field defaults M0.Defaults
 ---@field prompts string[]
 ---@field section_mark string
+---@field default_backend_name? string
+---@field default_prompt_name? string
 
 ---@type M0.Config
 local M = {
@@ -77,8 +79,11 @@ local M = {
         temperature = 1.0,
       },
     },
-    default_backend_name = '',
-    default_prompt_name = '',
+    prompts = {
+      ['useful assistant'] = 'You are a useful assistant.',
+    },
+    default_backend_name = 'openai',
+    default_prompt_name = 'useful assistant',
   },
   prompts = {},
   section_mark = '-------',

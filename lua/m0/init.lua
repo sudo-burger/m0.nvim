@@ -221,7 +221,7 @@ function M.setup(user_config)
   vim.keymap.set(
     { 'n' },
     '<Plug>(M0 scan_project)',
-    ':M0 scan-project<CR>',
+    ':M0 scan_project<CR>',
     { noremap = true, silent = true }
   )
 

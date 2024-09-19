@@ -14,6 +14,7 @@ local Utils = require 'm0.utils'
 ---@field state table
 
 ---@type M0.OpenAI
+---@diagnostic disable-next-line: missing-fields
 local M = {}
 function M:new(opts, state)
   return setmetatable(

@@ -26,22 +26,22 @@ function M:get_context(dir)
   ---@type string[]
   local files = require('plenary.scandir').scan_dir(dir)
   local context = [[The following is the context for this project.
-  The context is composed of zero or more files.
-  The contexts of each file are given here, bracketed by the string "__BEGIN_FILE "
-  followed by the file name at the start,
-  and by the string "__END_FILE " followed by the same file name at the end. \n]]
+    The context is structured using an XML-like syntax.
+    The "<project>" tag contains the project.
+    The "<file>" tag contains each file in the project.
+    The file tag may have "name" attribute.\n
+
+    <project>\n]]
 
   for _, f in pairs(files) do
     context = context
-      .. '__BEGIN_FILE '
+      .. '<file name="'
       .. f
-      .. '\n'
+      .. '">\n'
       .. read_file(f)
-      .. '\n'
-      .. '__END_FILE '
-      .. f
-      .. '\n'
+      .. '\n</file>\n'
   end
+  context = context .. '</project>\n'
   return context
 end
 return M

@@ -59,7 +59,8 @@ end
 function M:get_response_text(data)
   local j = Utils:json_decode(data)
   if j.choices == nil then
-    error('Received: ' .. data)
+    Utils:log_error('Received: ' .. data)
+    return
   end
   return j.choices[1].message.content
 end

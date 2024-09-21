@@ -14,6 +14,7 @@ local Utils = require 'm0.utils'
 ---@field state table
 
 ---@type M0.Anthropic
+---@diagnostic disable-next-line: missing-fields
 local M = {}
 
 function M:new(opts, state)
@@ -46,6 +47,15 @@ function M:get_messages(raw_messages)
   local messages = {}
   local role = 'user'
   local i = 1
+
+  if self.state.scan_project == true then
+    -- Prepend the project_context as the first user message.
+    table.insert(
+      messages,
+      { role = 'user', content = self.state.project_context }
+    )
+  end
+
   while i <= #raw_messages do
     table.insert(messages, { role = role, content = raw_messages[i] })
     role = role == 'user' and 'assistant' or 'user'
@@ -57,7 +67,8 @@ end
 function M:get_response_text(data)
   local j = Utils:json_decode(data)
   if j.content == nil then
-    error('Received: ' .. data)
+    Utils:log_error('Received: ' .. data)
+    return
   end
   return j.content[1].text
 end

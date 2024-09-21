@@ -1,5 +1,5 @@
 --- @class M0.Selector
---- @field make_selector fun(self:M0.Selector, opts: table, callback: fun(opts: table)):fun()
+--- @field make_selector fun(self:M0.Selector, opts: table, callback: fun(opts: table)):fun():nil
 
 local pickers = require 'telescope.pickers'
 local finders = require 'telescope.finders'
@@ -12,6 +12,7 @@ local action_state = require 'telescope.actions.state'
 ---@diagnostic disable-next-line: missing-fields
 local M = {}
 
+--- Private implementation of a single-item selector.
 --- @param opts table Telescope theme.
 --- @param title string? The title of the selector.
 --- @param results table A set of 'results' to select from.
@@ -23,6 +24,7 @@ local make_selector = function(opts, title, results, callback)
     pickers
       .new(opts, {
         prompt_title = title,
+        -- The finder shows the keys in the key-value pairs.
         finder = finders.new_table {
           results = results,
           entry_maker = function(entry)
@@ -33,6 +35,7 @@ local make_selector = function(opts, title, results, callback)
             }
           end,
         },
+        -- The previewer shows the values in the key-value pairs.
         previewer = previewers.new_buffer_previewer {
           ---@diagnostic disable-next-line: unused-local
           define_preview = function(self, entry, _status)
@@ -46,6 +49,7 @@ local make_selector = function(opts, title, results, callback)
           end,
         },
         sorter = conf.generic_sorter(opts),
+        -- Run the callback on the selection and cleanup.
         ---@diagnostic disable-next-line: unused-local
         attach_mappings = function(prompt_bufnr, _map)
           actions.select_default:replace(function()
@@ -60,7 +64,7 @@ local make_selector = function(opts, title, results, callback)
   end
 end
 
----
+--- A single-item selector.
 --- @param opts table Telescope theme.
 --- @param callback fun(opts: table):nil A callback to be called on selection.
 --- @return fun():nil

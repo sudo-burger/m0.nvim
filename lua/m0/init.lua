@@ -237,6 +237,7 @@ function M.setup(user_config)
 
   ---@type table<string, M0Subcommand>
   local subcommand_tbl = {
+    -- What backend to use.
     backend = {
       impl = function(_, _)
         local items = {}
@@ -251,6 +252,7 @@ function M.setup(user_config)
     chat = {
       impl = M.M0chat,
     },
+    -- What prompt to use.
     prompt = {
       impl = function(_, _)
         local items = {}
@@ -262,6 +264,7 @@ function M.setup(user_config)
         end)()
       end,
     },
+    -- Whether to scan the project for added context or not.
     scan_project = {
       impl = function(_, _)
         local current = ''
@@ -286,7 +289,7 @@ function M.setup(user_config)
     },
   }
 
-  ---@param opts table :h lua-guide-commands-create
+  ---@param opts table See ':h lua-guide-commands-create'
   local function M0(opts)
     local fargs = opts.fargs
     local subcommand_key = fargs[1]

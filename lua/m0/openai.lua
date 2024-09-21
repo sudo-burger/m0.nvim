@@ -44,10 +44,19 @@ function M:get_messages(raw_messages)
   local messages = {}
   local role = 'user'
   local i = 1
+
   -- The OpenAI completions API requires the prompt to be
   -- the first message (with role 'system').
   -- Patch the messages here.
   table.insert(messages, 1, { role = 'system', content = self.state.prompt })
+
+  if self.state.scan_project == true then
+    -- Prepend the project_context as the first user message.
+    table.insert(
+      messages,
+      { role = 'user', content = self.state.project_context }
+    )
+  end
   while i <= #raw_messages do
     table.insert(messages, { role = role, content = raw_messages[i] })
     role = role == 'user' and 'assistant' or 'user'

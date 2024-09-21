@@ -44,16 +44,15 @@ local function make_backend(API, msg, opts, state)
     opts = opts,
     -- name = opts.backend_name,
     run = function()
-      local messages = msg:get_messages()
-
-      -- If a scan of the project has been requested, it should make sense
-      -- to refresh it on every run.
       if state.scan_project == true then
+        -- If a scan of the project has been requested, it should make sense
+        -- to re-scan on every turn, to catch code changes.
+        -- FIXME: assume that the current working directory is the root of the project.
         M.State.project_context = ScanProject:get_context(vim.fn.getcwd())
-        table.insert(messages, 1, M.State.project_context)
       end
 
       local body = API:make_body()
+      local messages = msg_buf:get_messages()
       body.messages = API:get_messages(messages)
 
       local curl_opts = {

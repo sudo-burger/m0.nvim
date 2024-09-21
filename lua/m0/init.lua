@@ -35,11 +35,11 @@ local VimBuffer = require 'm0.vimbuffer'
 ---Returns a table including the backend-specific implementation of the function run().
 ---
 ---@param API M0.LLMAPI The API handler.
----@param msg M0.VimBuffer
+---@param msg_buf M0.VimBuffer
 ---@param opts M0.BackendOptions
 ---@param state State
 ---@return Backend
-local function make_backend(API, msg, opts, state)
+local function make_backend(API, msg_buf, opts, state)
   return {
     opts = opts,
     -- name = opts.backend_name,
@@ -72,12 +72,12 @@ local function make_backend(API, msg, opts, state)
 
           if event == 'delta' and d ~= '' then
             -- Add the delta to the current line.
-            msg:set_last_line(msg:get_last_line() .. d)
+            msg_buf:set_last_line(msg_buf:get_last_line() .. d)
           elseif event == 'other' and d ~= '' then
             -- Could be an error.
             Utils:log_info(d)
           elseif event == 'done' then
-            msg:close_section()
+            msg_buf:close_section()
           else
             -- Utils:log_info(
             --   'Other stream results (1): [' .. event .. '][' .. d .. ']'
@@ -93,14 +93,14 @@ local function make_backend(API, msg, opts, state)
           -- Build the reply in the message handler.
           local res = API:get_response_text(out.body)
           if res then
-            msg:set_last_line(res)
+            msg_buf:set_last_line(res)
           end
-          msg:close_section()
+          msg_buf:close_section()
         end)
       end
 
       -- The closing section mark is printed by the curl callbacks.
-      msg:open_section()
+      msg_buf:open_section()
       local response = require('plenary.curl').post(opts.url, curl_opts)
       if response.status ~= nil and response.status ~= 200 then
         Utils:log_error('API error (1): ' .. vim.inspect(response))
@@ -117,7 +117,7 @@ end
 ---@param backend_name string The name of the backend, as found in the user configuration.
 ---@return nil
 function M:M0backend(backend_name)
-  local msg = VimBuffer:new(self.Config)
+  local msg_buf = VimBuffer:new(self.Config)
   -- Use deepcopy to avoid cluttering the configuration with backend-specific settings.
   local backend_opts = vim.deepcopy(self.Config.backends[backend_name])
   local provider_name = backend_opts.provider
@@ -151,7 +151,7 @@ function M:M0backend(backend_name)
     return
   end
 
-  M.State.backend = make_backend(API, msg, backend_opts, M.State)
+  M.State.backend = make_backend(API, msg_buf, backend_opts, M.State)
 end
 
 ---Select prompt interactively.

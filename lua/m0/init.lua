@@ -18,6 +18,9 @@ local Utils = require 'm0.utils'
 ---@type M0.ScanProject
 local ScanProject = require 'm0.scanproject'
 
+---@type M0.Selector
+local Selector = require 'm0.selector'
+
 local M = {
   ---@type State
   State = {},
@@ -237,15 +240,12 @@ function M.setup(user_config)
     backend = {
       impl = function(_, _)
         local items = {}
-        for k, _ in pairs(M.Config.backends) do
-          table.insert(items, k)
+        for k, v in pairs(M.Config.backends) do
+          table.insert(items, { k = k, v = vim.inspect(v) })
         end
-        table.sort(items)
-        vim.ui.select(items, {}, function(choice)
-          if choice then
-            M:M0backend(choice)
-          end
-        end)
+        Selector:make_selector(items, function(opts)
+          M:M0backend(opts.ordinal)
+        end)()
       end,
     },
     chat = {
@@ -254,15 +254,12 @@ function M.setup(user_config)
     prompt = {
       impl = function(_, _)
         local items = {}
-        for k, _ in pairs(M.Config.prompts) do
-          table.insert(items, k)
+        for k, v in pairs(M.Config.prompts) do
+          table.insert(items, { k = k, v = v })
         end
-        table.sort(items)
-        vim.ui.select(items, {}, function(choice)
-          if choice then
-            M:M0prompt(choice)
-          end
-        end)
+        Selector:make_selector(items, function(opts)
+          M:M0prompt(opts.ordinal)
+        end)()
       end,
     },
     scan_project = {

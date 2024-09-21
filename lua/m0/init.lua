@@ -239,6 +239,11 @@ function M.setup(user_config)
     -- What backend to use.
     backend = {
       impl = function(_, _)
+        -- The selector requires the items to be in the format
+        -- {
+        --   ( k = "foo", v = "bar" },
+        --   ( k = "baz", v = "boz" },
+        -- }
         local items = {}
         for k, v in pairs(M.Config.backends) do
           table.insert(items, { k = k, v = vim.inspect(v) })
@@ -254,6 +259,11 @@ function M.setup(user_config)
     -- What prompt to use.
     prompt = {
       impl = function(_, _)
+        -- The selector requires the items to be in the format
+        -- {
+        --   ( k = "foo", v = "bar" },
+        --   ( k = "baz", v = "boz" },
+        -- }
         local items = {}
         for k, v in pairs(M.Config.prompts) do
           table.insert(items, { k = k, v = v })

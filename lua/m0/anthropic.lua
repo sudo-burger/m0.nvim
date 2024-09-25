@@ -25,6 +25,24 @@ function M:new(opts, state)
 end
 
 function M:make_body()
+  local system
+  if self.opts.anthropic_beta then
+    system = {
+      { type = 'text', text = self.state.prompt },
+    }
+    -- If we are scanning the project and have access to caching
+    -- (givent by the anthropic beta feature), pass the scan as a system message.
+    if self.state.scan_project == true then
+      table.insert(system, {
+        type = 'text',
+        text = self.state.project_context,
+        cache_control = { type = 'ephemeral' },
+      })
+    end
+  else
+    system = self.state.prompt
+  end
+
   return {
     model = self.opts.model,
     temperature = self.opts.temperature,
@@ -39,6 +57,7 @@ function M:make_headers()
     content_type = 'application/json',
     x_api_key = self.opts.api_key(),
     anthropic_version = self.opts.anthropic_version,
+    anthropic_beta = self.opts.anthropic_beta or nil,
   }
 end
 
@@ -48,7 +67,9 @@ function M:get_messages(raw_messages)
   local role = 'user'
   local i = 1
 
-  if self.state.scan_project == true then
+  -- If we are scanning the project but don't have access to caching
+  -- (givent by the anthropic beta feature), pass the scan as a user message.
+  if self.state.scan_project == true and not self.opts.anthropic_beta then
     -- Prepend the project_context as the first user message.
     table.insert(
       messages,

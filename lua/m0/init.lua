@@ -141,8 +141,13 @@ function M:M0backend(backend_name)
 
   -- Merge the defaults, provider opts, and backend opts.
   -- The former are overridden by the latter.
-  backend_opts =
-    vim.tbl_extend('force', default_opts, provider_opts, backend_opts)
+  backend_opts = vim.tbl_extend(
+    'force',
+    default_opts,
+    provider_opts,
+    backend_opts,
+    { name = backend_name }
+  )
 
   ---@type M0.LLMAPI?
   local API = APIFactory.create(backend_opts.api_type, backend_opts, M.State)

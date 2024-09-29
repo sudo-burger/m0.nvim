@@ -189,24 +189,11 @@ end
 ---@param user_config table The user configuration.
 ---@return nil
 function M.setup(user_config)
-  -- Merge user config to defaults.
+  -- Merge user configuration, overriding defaults.
   M.Config = vim.tbl_extend('force', M.Config, user_config or {})
 
   -- Sanity checks.
-  if M.Config.backends[M.Config.default_backend_name] == nil then
-    error(
-      'Default backend ('
-        .. M.Config.default_backend_name
-        .. ') not in configuration.'
-    )
-  end
-  if M.Config.prompts[M.Config.default_prompt_name] == nil then
-    error(
-      'Default prompt ('
-        .. M.Config.default_prompt_name
-        .. ') not in configuration.'
-    )
-  end
+  M.Config:validate()
 
   -- Activate defaults.
   M:M0prompt(M.Config.default_prompt_name)

@@ -39,6 +39,9 @@
 ---@field section_mark string
 ---@field default_backend_name? string
 ---@field default_prompt_name? string
+---@field validate? fun(self:M0.Config):any
+
+local Utils = require 'm0.Utils'
 
 ---@type M0.Config
 local M = {
@@ -107,5 +110,44 @@ local M = {
   prompts = {},
   section_mark = '-------',
 }
+
+function M:validate()
+  local function do_validate()
+    if not self.default_backend_name then
+      Utils:log_error 'No default backend configured.'
+    end
+    if not self.backends or vim.tbl_isempty(self.backends) then
+      Utils:log_error 'No backends configured.'
+    end
+    if not self.backends[self.default_backend_name] then
+      Utils:log_error(
+        'Default backend ('
+          .. self.default_backend_name
+          .. ') is not among configured backends ('
+          .. vim.inspect(self.backends)
+          .. ')'
+      )
+    end
+    if not self.default_prompt_name then
+      Utils:log_error 'No default backend configured.'
+    end
+    if not self.backends or vim.tbl_isempty(self.prompts) then
+      Utils:log_error 'No prompts configured.'
+    end
+    if not self.prompts[self.default_prompt_name] == nil then
+      Utils:log_error(
+        'Default prompt ('
+          .. self.default_prompt_name
+          .. ') is not among configured prompts ('
+          .. vim.inspect(self.prompts)
+          .. ')'
+      )
+    end
+  end
+  if not pcall(do_validate) then
+    Utils:log_error 'Configuration error. Please check your setup.'
+    return
+  end
+end
 
 return M

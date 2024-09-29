@@ -48,7 +48,7 @@ function M:make_body()
     temperature = self.opts.temperature,
     max_tokens = self.opts.max_tokens,
     stream = self.opts.stream,
-    system = self.state.prompt,
+    system = system,
   }
 end
 
@@ -98,11 +98,6 @@ function M:get_delta_text(body)
   if body == 'event: message_stop' then
     return 'done', body
   end
-
-  if body == '\n' or body == '' or string.find(body, '^event: ') ~= nil then
-    return 'cruft', body
-  end
-
   if string.find(body, '^data: ') ~= nil then
     -- We are in a 'data: ' package now.
     -- Extract and return the text payload.
@@ -115,8 +110,6 @@ function M:get_delta_text(body)
     then
       return 'delta', json_data.delta.text
     end
-  else
-    return 'other', body
   end
   -- Not data, so most likely metadata that we only would want to see for
   -- debugging purposes.

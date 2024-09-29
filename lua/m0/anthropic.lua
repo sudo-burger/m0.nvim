@@ -26,12 +26,15 @@ end
 
 function M:make_body()
   local system
+
+  -- The "prompt caching" feature replaces the body.system element with
+  -- a list of system elements.
   if self.opts.anthropic_beta then
     system = {
       { type = 'text', text = self.state.prompt },
     }
-    -- If we are scanning the project and have access to caching
-    -- (givent by the anthropic beta feature), pass the scan as a system message.
+    -- If we have access to prompt caching and we are scanning the project,
+    -- ensure that the project context is cached.
     if self.state.scan_project == true then
       table.insert(system, {
         type = 'text',
@@ -57,7 +60,7 @@ function M:make_headers()
     content_type = 'application/json',
     x_api_key = self.opts.api_key(),
     anthropic_version = self.opts.anthropic_version,
-    anthropic_beta = self.opts.anthropic_beta or nil,
+    anthropic_beta = self.opts.anthropic_beta,
   }
 end
 
@@ -68,9 +71,8 @@ function M:get_messages(raw_messages)
   local i = 1
 
   -- If we are scanning the project but don't have access to caching
-  -- (givent by the anthropic beta feature), pass the scan as a user message.
+  -- (given by the Anthropic beta feature), pass the scan as a user message.
   if self.state.scan_project == true and not self.opts.anthropic_beta then
-    -- Prepend the project_context as the first user message.
     table.insert(
       messages,
       { role = 'user', content = self.state.project_context }

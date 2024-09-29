@@ -27,7 +27,7 @@ function M:make_body()
   return {
     model = self.opts.model,
     temperature = self.opts.temperature,
-    max_tokens = self.opts.max_tokens,
+    max_completion_tokens = self.opts.max_completion_tokens,
     stream = self.opts.stream,
   }
 end

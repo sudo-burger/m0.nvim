@@ -1,42 +1,58 @@
----@alias api_type "anthropic" | "openai"
+---@alias anthropic_api_type "anthropic"
+---@alias openai_api_type "openai"
 
----@class M0.ProviderOptions
----@field api_type api_type
+---@class M0.AnthropicProviderOptions
+---@field api_type anthropic_api_type
 ---@field api_key? string
----@field anthropic_version? string
+---@field anthropic_version string
 ---@field url string
 ---@field models string[]
----@field max_tokens number
----@field stream boolean
----@field temperature number
+---@field max_tokens number?|nil
+---@field stream boolean?|nil
+---@field temperature number?|nil
+
+---@class M0.OpenAIProviderOptions
+---@field api_type openai_api_type
+---@field api_key? string
+---@field url string
+---@field models string[]
+---@field max_completion_tokens number?|nil
+---@field stream boolean?|nil
+---@field temperature number?|nil
+
+---@class M0.BackendOptions
+---@field provider string
+---@field model string
 
 ---@class M0.Defaults
----@field providers table<string, M0.ProviderOptions>
+---@field backends table<string, M0.BackendOptions>
+---@field providers table<string, M0.AnthropicProviderOptions|M0.OpenAIProviderOptions>
+---@field prompts table<string, string>
 ---@field default_backend_name string
 ---@field default_prompt_name string
 
----@class M0.BackendOptions:M0.ProviderOptions
----@field provider string
----@field api_key string
----@field model string
----@field stream boolean?
----@field max_tokens number?
----@field temperature number?
-
 ---@class M0.Config
+---@field providers table<string,M0.AnthropicProviderOptions|M0.OpenAIProviderOptions>
 ---@field backends table<string,M0.BackendOptions>
----@field providers table<string,M0.ProviderOptions>
 ---@field defaults M0.Defaults
----@field prompts string[]
+---@field prompts table<string, string>
 ---@field section_mark string
 ---@field default_backend_name? string
 ---@field default_prompt_name? string
 
 ---@type M0.Config
 local M = {
-  backends = {},
   providers = {},
+  backends = {},
   defaults = {
+    backends = {
+      ['openai:gpt-4o-mini-stream'] = {
+        provider = 'openai',
+        model = 'gpt-4o-mini',
+        stream = true,
+        max_completion_tokens = 4096,
+      },
+    },
     providers = {
       ['anthropic'] = {
         api_type = 'anthropic',
@@ -47,9 +63,9 @@ local M = {
           'claude-3-5-sonnet-20240620',
           'claude-3-opus-20240229',
         },
-        max_tokens = 128,
+        max_tokens = 4096,
         stream = false,
-        temperature = 1.0,
+        temperature = nil,
       },
       ['openai'] = {
         api_type = 'openai',
@@ -57,32 +73,34 @@ local M = {
         models = {
           'gpt-4o',
           'gpt-4o-mini',
+          'o1-preview',
+          'o1-mini',
         },
-        max_tokens = 128,
+        max_completion_tokens = nil,
         stream = false,
-        temperature = 1.0,
+        temperature = nil,
       },
       ['mistral'] = {
         api_type = 'openai',
         url = 'https://api.mistral.ai/v1/chat/completions',
         models = { 'mistral-large-latest' },
-        max_tokens = 128,
+        max_completion_tokens = nil,
         stream = false,
-        temperature = 1.0,
+        temperature = nil,
       },
       ['groq'] = {
         api_type = 'openai',
         url = 'https://api.groq.com/openai/v1/chat/completions',
         models = { 'mixtral-8x7b-32768' },
-        max_tokens = 128,
+        max_completion_tokens = nil,
         stream = false,
-        temperature = 1.0,
+        temperature = nil,
       },
     },
     prompts = {
       ['useful assistant'] = 'You are a useful assistant.',
     },
-    default_backend_name = 'openai',
+    default_backend_name = 'openai:gpt-4o-mini-stream',
     default_prompt_name = 'useful assistant',
   },
   prompts = {},

@@ -57,6 +57,7 @@ local M = {
       ['anthropic'] = {
         api_type = 'anthropic',
         anthropic_version = '2023-06-01',
+        anthropic_beta = 'prompt-caching-2024-07-31',
         url = 'https://api.anthropic.com/v1/messages',
         models = {
           'claude-3-haiku-20240307',

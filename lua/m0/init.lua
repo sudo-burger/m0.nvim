@@ -189,7 +189,10 @@ end
 ---@param user_config table The user configuration.
 ---@return nil
 function M.setup(user_config)
+  -- Merge user config to defaults.
   M.Config = vim.tbl_extend('force', M.Config, user_config or {})
+
+  -- Sanity checks.
   if M.Config.backends[M.Config.default_backend_name] == nil then
     error(
       'Default backend ('
@@ -204,9 +207,12 @@ function M.setup(user_config)
         .. ') not in configuration.'
     )
   end
+
+  -- Activate defaults.
   M:M0prompt(M.Config.default_prompt_name)
   M:M0backend(M.Config.default_backend_name)
 
+  -- Create keymaps.
   vim.keymap.set(
     { 'n' },
     '<Plug>(M0 backend)',
@@ -349,7 +355,7 @@ function M.setup(user_config)
           :totable()
       end
     end,
-    bang = true, -- If you want to support ! modifiers
+    bang = true, -- If you want to support !-modifiers
   })
 end
 

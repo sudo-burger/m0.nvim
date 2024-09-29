@@ -12,6 +12,7 @@ Goals:
 Supported APIs:
 * OpenAI: completions (https://platform.openai.com/docs/api-reference/making-requests)
 * Anthropic: messages (https://docs.anthropic.com/claude/reference/messages_post)
+  - Supports prompt caching for project scans.
 
 ## Installation
 
@@ -55,7 +56,7 @@ return {
         provider = 'openai',
         model = 'gpt-4o-mini',
         stream = true,
-        max_tokens = 10000,
+        max_tokens = 4096,
         temperature = 0.8,
       },
       ['anthropic:claude-3-haiku'] = {

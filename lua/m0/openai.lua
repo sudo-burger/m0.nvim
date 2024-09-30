@@ -24,11 +24,17 @@ function M:new(opts, state)
 end
 
 function M:make_body()
+  -- Handle model-specific defaults.
+  local model_defaults = vim.tbl_filter(function(t)
+    return t.name == self.opts.model.name
+  end, self.opts.models)
+
   return {
-    model = self.opts.model,
+    model = self.opts.model.name,
     temperature = self.opts.temperature,
-    max_completion_tokens = self.opts.max_completion_tokens,
     stream = self.opts.stream,
+    max_completion_tokens = self.opts.max_completion_tokens
+      or model_defaults[1].max_completion_tokens,
   }
 end
 

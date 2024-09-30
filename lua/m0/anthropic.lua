@@ -46,11 +46,17 @@ function M:make_body()
     system = self.state.prompt
   end
 
+  -- Handle model-specific defaults.
+  local model_defaults = vim.tbl_filter(function(t)
+    return t.name == self.opts.model.name
+  end, self.opts.models)
+
+  print('model defaults: ' .. vim.inspect(model_defaults))
   return {
-    model = self.opts.model,
+    model = self.opts.model.name,
     temperature = self.opts.temperature,
-    max_tokens = self.opts.max_tokens,
     stream = self.opts.stream,
+    max_tokens = self.opts.max_tokens or model_defaults[1].max_tokens,
     system = system,
   }
 end

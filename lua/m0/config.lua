@@ -1,13 +1,21 @@
 ---@alias anthropic_api_type "anthropic"
 ---@alias openai_api_type "openai"
 
+---@class M0.AnthropicModelOptions
+---@field name string
+---@field max_tokens integer
+
+---@class M0.OpenAIModelOptions
+---@field name string
+---@field max_tokens? integer
+---@field max_completion_tokens? integer
+
 ---@class M0.AnthropicProviderOptions
 ---@field api_type anthropic_api_type
 ---@field api_key? string
 ---@field anthropic_version string
 ---@field url string
----@field models string[]
----@field max_tokens number?|nil
+---@field models table<string, M0.AnthropicModelOptions>
 ---@field stream boolean?|nil
 ---@field temperature number?|nil
 
@@ -15,14 +23,13 @@
 ---@field api_type openai_api_type
 ---@field api_key? string
 ---@field url string
----@field models string[]
----@field max_completion_tokens number?|nil
+---@field models table<string, M0.OpenAIModelOptions>
 ---@field stream boolean?|nil
 ---@field temperature number?|nil
 
 ---@class M0.BackendOptions
 ---@field provider string
----@field model string
+---@field model table[M0.AnthropicModelOptions|M0.OpenAIModelOptions]
 
 ---@class M0.Defaults
 ---@field backends table<string, M0.BackendOptions>
@@ -49,11 +56,10 @@ local M = {
   backends = {},
   defaults = {
     backends = {
-      ['openai:gpt-4o-mini-stream'] = {
+      -- Default/example backend.
+      ['openai:gpt-4o-mini'] = {
         provider = 'openai',
-        model = 'gpt-4o-mini',
-        stream = true,
-        max_completion_tokens = 4096,
+        model = { name = 'gpt-4o-mini' },
       },
     },
     providers = {
@@ -62,43 +68,49 @@ local M = {
         anthropic_version = '2023-06-01',
         anthropic_beta = 'prompt-caching-2024-07-31',
         url = 'https://api.anthropic.com/v1/messages',
+        stream = true,
+        temperature = 0.7,
         models = {
-          'claude-3-haiku-20240307',
-          'claude-3-5-sonnet-20240620',
-          'claude-3-opus-20240229',
+          { name = 'claude-3-5-sonnet-20240620', max_tokens = 8192 },
+          { name = 'claude-3-haiku-20240307', max_tokens = 4096 },
+          { name = 'claude-3-opus-20240229', max_tokens = 4096 },
+          { name = 'claude-3-sonnet-20240229', max_tokens = 4096 },
         },
-        max_tokens = 4096,
-        stream = false,
-        temperature = nil,
       },
       ['openai'] = {
         api_type = 'openai',
         url = 'https://api.openai.com/v1/chat/completions',
+        stream = true,
+        temperature = 0.7,
         models = {
-          'gpt-4o',
-          'gpt-4o-mini',
-          'o1-preview',
-          'o1-mini',
+          { name = 'gpt-4o', max_completion_tokens = 4096 },
+          { name = 'chatgpt-4o-latest', max_completion_tokens = 16384 },
+          { name = 'gpt-4o-mini', max_completion_tokens = 16384 },
+          { name = 'o1-mini', max_completion_tokens = 65536 },
+          { name = 'o1-preview', max_completion_tokens = 32768 },
         },
-        max_completion_tokens = nil,
-        stream = false,
-        temperature = nil,
       },
       ['mistral'] = {
         api_type = 'openai',
         url = 'https://api.mistral.ai/v1/chat/completions',
-        models = { 'mistral-large-latest' },
-        max_completion_tokens = nil,
-        stream = false,
-        temperature = nil,
+        stream = true,
+        temperature = 0.7,
+        models = {
+          { name = 'codestral-latest', max_tokens = 1024 },
+          { name = 'mistral-large-latest', max_tokens = 1024 },
+          { name = 'mistral-small-latest', max_tokens = 1024 },
+          { name = 'open-mistral-nemo', max_tokens = 1024 },
+          { name = 'pixtral-12b-2409', max_tokens = 1024 },
+        },
       },
       ['groq'] = {
         api_type = 'openai',
         url = 'https://api.groq.com/openai/v1/chat/completions',
-        models = { 'mixtral-8x7b-32768' },
-        max_completion_tokens = nil,
-        stream = false,
-        temperature = nil,
+        stream = true,
+        temperature = 0.7,
+        models = {
+          { name = 'mixtral-8x7b-32768', max_tokens = 32768 },
+        },
       },
     },
     prompts = {
@@ -113,12 +125,15 @@ local M = {
 
 function M:validate()
   local function do_validate()
+    -- Must have a default backend name.
     if not self.default_backend_name then
       Utils:log_error 'No default backend configured.'
     end
+    -- Must have at least one configured backend.
     if not self.backends or vim.tbl_isempty(self.backends) then
       Utils:log_error 'No backends configured.'
     end
+    -- The default backend must be configured.
     if not self.backends[self.default_backend_name] then
       Utils:log_error(
         'Default backend ('
@@ -128,12 +143,15 @@ function M:validate()
           .. ')'
       )
     end
+    -- Must have a default prompt name.
     if not self.default_prompt_name then
       Utils:log_error 'No default backend configured.'
     end
+    -- Must have at least one configured prompt.
     if not self.backends or vim.tbl_isempty(self.prompts) then
       Utils:log_error 'No prompts configured.'
     end
+    -- The default prompt must be configured.
     if not self.prompts[self.default_prompt_name] == nil then
       Utils:log_error(
         'Default prompt ('

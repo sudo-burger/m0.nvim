@@ -110,6 +110,7 @@ local M = {
         temperature = 0.7,
         models = {
           { name = 'mixtral-8x7b-32768', max_tokens = 32768 },
+          { name = 'llama-3.2-3b-preview', max_tokens = 8192 },
         },
       },
     },

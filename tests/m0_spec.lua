@@ -1,20 +1,19 @@
 local M0 = require 'm0'
 local assert = require 'luassert'
 local stub = require 'luassert.stub'
-local spy = require 'luassert.spy'
+
+local function make_dummpy_api_key()
+  return 'dummy_key'
+end
 
 describe('m0.nvim', function()
   local mock_config = {
     providers = {
       ['openai'] = {
-        api_key = function()
-          return 'dummy_key'
-        end,
+        api_key = make_dummpy_api_key,
       },
       ['anthropic'] = {
-        api_key = function()
-          return 'dummy_key'
-        end,
+        api_key = make_dummpy_api_key,
       },
     },
     backends = {
@@ -85,6 +84,15 @@ describe('m0.nvim', function()
     end)
   end)
 
+  describe('utility', function()
+    it('can debug', function()
+      assert.has_no.errors(function()
+        local debug = M0:debug()
+        ---@diagnostic disable-next-line: unused-local
+        local len = string.len(debug)
+      end)
+    end)
+  end)
   describe('backend management', function()
     it('can change the backend', function()
       local initial_backend = M0.State.backend.opts.name

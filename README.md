@@ -18,21 +18,6 @@ Supported APIs:
 
 Using [lazy.nvim](https://github.com/folke/lazy.nvim)
 ``` lua
-
--- Suggested helpers for safely importing API keys.
--- Depends on 'pass' (https://www.passwordstore.org).
-local function get_key(key_name)
-  return string.gsub(vim.fn.system('pass ' .. key_name), '%s+', '')
-end
-local function anthropic_key()
-  return get_key 'api.anthropic.com/key-0'
-end
-local function mistral_key()
-  return get_key 'api.mistral.ai/key-0'
-end
-local function openai_key()
-  return get_key 'api.openai.com/key-0'
-end
 return {
   'sudo-burger/m0.nvim',
   dependencies = {
@@ -42,35 +27,32 @@ return {
   opts = {
     providers = {
       ['anthropic'] = {
-        api_key = anthropic_key,
+        api_key = <anthropic_key>,
       },
       ['openai'] = {
-        api_key = openai_key,
+        api_key = <openai_key>,
       },
       ['mistral'] = {
-        api_key = mistral_key,
+        api_key = <mistral_key>,
       },
     },
     backends = {
-      ['openai:gpt-4o-mini-stream'] = {
+      ['openai:gpt-4o-mini-nostream'] = {
         provider = 'openai',
-        model = 'gpt-4o-mini',
-        stream = true,
-        max_tokens = 4096,
+        model = { name = 'gpt-4o-mini', max_completion_tokens = 128 },
+        stream = false,
         temperature = 0.8,
       },
       ['anthropic:claude-3-haiku'] = {
         provider = 'anthropic',
-        model = 'claude-3-haiku-20240307',
-        stream = true,
+        model = { name = 'claude-3-haiku-20240307' },
       },
       ['mistral:mistral-large-latest-stream'] = {
-        -- M0 knows to use the OpenAI API for Mistral.
         provider = 'mistral',
-        model = 'mistral-large-latest',
+        model = { name = 'mistral-large-latest', max_tokens = 3000 },
       },
     },
-    default_backend_name = 'openai:gpt-4o-mini-stream',
+    default_backend_name = 'openai:gpt-4o-mini-nostream',
     prompts = {
       ['Helpful assistant'] = 'You are a helpful assistant.',
       ['Marilyn Monroe'] = 'Assume the persona of Marilyn Monroe.',
@@ -88,10 +70,11 @@ return {
 ```
 
 ## Usage
-":M0 chat" start/continue chat.
-":M0 scan_project" include the current project as conversation context.
-":M0 backend" to select a backend.
-":M0 prompt" to select a prompt.
+- ":M0 chat" start/continue chat.
+- ":M0 scan_project" include the current project as conversation context.
+  - Prompt caching used when supported.
+- ":M0 backend" to select a backend.
+- ":M0 prompt" to select a prompt.
 
 ## Similar Projects
 - [karthink/GPTel](https://github.com/karthink/gptel)

@@ -51,7 +51,6 @@ function M:make_body()
     return t.name == self.opts.model.name
   end, self.opts.models)
 
-  print('model defaults: ' .. vim.inspect(model_defaults))
   return {
     model = self.opts.model.name,
     temperature = self.opts.temperature,

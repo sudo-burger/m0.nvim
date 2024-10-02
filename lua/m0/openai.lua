@@ -81,29 +81,28 @@ function M:get_response_text(data)
 end
 
 function M:get_delta_text(body)
-  if body == 'data: [DONE]' then
-    return 'done', body
-  end
+  print('DEBUG: ' .. body)
   if string.find(body, '^data: ') ~= nil then
-    -- We are in a 'data: ' package now.
-    -- Extract and return the text payload.
-    --
-    -- The last message in an openai delta will have:
-    --   choices[1].delta == {}
-    --   choices[1].finish_reason == 'stop'
-    --
+    -- The redundant packet '[DONE]' used by the OpenAI API.
+    if body == 'data: [DONE]' then
+      return 'cruft', body
+    end
     local json_data = Utils:json_decode(string.sub(body, 7))
     if
-      json_data ~= nil
-      and json_data.object == 'chat.completion.chunk'
-      and json_data.choices[1].delta.content ~= nil
+      -- Unexpected data? Return for debugging purposes.
+      json_data == nil or json_data.object ~= 'chat.completion.chunk'
     then
+      return 'cruft', body
+    end
+    if json_data.choices[1].delta.content ~= nil then
       return 'delta', json_data.choices[1].delta.content
     end
+    -- The last message in an OpenAI streaming response.
+    if json_data.choices[1].finish_reason == 'stop' then
+      return 'done', body
+    end
   end
-
-  -- Not data, so most likely metadata that we only would want to see for
-  -- debugging purposes.
+  -- Possibly metadata that we may want to see for debugging purposes.
   return 'cruft', body
 end
 

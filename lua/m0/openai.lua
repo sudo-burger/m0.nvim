@@ -101,7 +101,7 @@ function M:get_delta_text(body)
     end
     local json_data = Utils:json_decode(string.sub(body, 7))
     if json_data.usage ~= vim.NIL then
-      self.state.logger:log_debug('HELLO: ' .. vim.inspect(json_data))
+      self.state.logger:log_debug(vim.inspect(json_data.usage))
     end
     if
       -- Unexpected data? Return for debugging purposes.

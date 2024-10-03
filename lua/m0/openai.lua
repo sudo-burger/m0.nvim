@@ -29,13 +29,20 @@ function M:make_body()
     return t.name == self.opts.model.name
   end, self.opts.models)
 
-  return {
+  local body = {
     model = self.opts.model.name,
     temperature = self.opts.temperature,
     stream = self.opts.stream,
     max_completion_tokens = self.opts.max_completion_tokens
       or model_defaults[1].max_completion_tokens,
   }
+
+  if self.opts.stream and self.state.log_level <= vim.log.levels.DEBUG then
+    body.stream_options = {
+      include_usage = true,
+    }
+  end
+  return body
 end
 
 function M:make_headers()
@@ -73,7 +80,14 @@ end
 
 function M:get_response_text(data)
   local j = Utils:json_decode(data)
-  if j.choices == nil then
+  if
+    not (
+      j.choices
+      and j.choices[1]
+      and j.choices[1].message
+      and j.choices[1].message.content
+    )
+  then
     return
   end
   return j.choices[1].message.content
@@ -81,26 +95,38 @@ end
 
 function M:get_delta_text(body)
   if string.find(body, '^data: ') ~= nil then
-    -- The redundant packet '[DONE]' used by the OpenAI API.
+    -- The OpenAI API streaming calls end with this non-JSON message.
     if body == 'data: [DONE]' then
-      return 'cruft', body
+      return 'done', body
     end
     local json_data = Utils:json_decode(string.sub(body, 7))
+    if json_data.usage ~= vim.NIL then
+      self.state.logger:log_debug('HELLO: ' .. vim.inspect(json_data))
+    end
     if
       -- Unexpected data? Return for debugging purposes.
-      json_data == nil or json_data.object ~= 'chat.completion.chunk'
+      json_data == nil
+      or json_data.object ~= 'chat.completion.chunk'
+      or not (
+        json_data.choices
+        and json_data.choices[1]
+        and json_data.choices[1].delta
+        and json_data.choices[1].delta.content
+      )
     then
       return 'cruft', body
     end
     if json_data.choices[1].delta.content ~= nil then
       return 'delta', json_data.choices[1].delta.content
     end
-    -- The last message in an OpenAI streaming response.
+    -- The last delta message in an OpenAI streaming response,
+    -- but more messages may come later, e.g. if we requested stats,
+    -- so we aren't done yet.
     if json_data.choices[1].finish_reason == 'stop' then
-      return 'done', body
+      return 'cruft', body
     end
   end
-  -- Possibly metadata that we may want to see for debugging purposes.
+  -- Anything we don't expect?
   return 'cruft', body
 end
 

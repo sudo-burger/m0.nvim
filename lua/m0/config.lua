@@ -1,5 +1,8 @@
----@alias anthropic_api_type "anthropic"
----@alias openai_api_type "openai"
+local Logger = require 'm0.logger'
+
+---@alias anthropic_api_type 'anthropic'
+---@alias openai_api_type 'openai'
+---@alias api_type  anthropic_api_type | openai_api_type
 
 ---@class M0.AnthropicModelOptions
 ---@field name string
@@ -44,14 +47,14 @@
 ---@field defaults M0.Defaults
 ---@field prompts table<string, string>
 ---@field section_mark string
+---@field log_level? integer See vim.log.loglevel
 ---@field default_backend_name? string
 ---@field default_prompt_name? string
 ---@field validate? fun(self:M0.Config):any
 
-local Utils = require 'm0.Utils'
-
 ---@type M0.Config
 local M = {
+  log_level = vim.log.levels.INFO,
   providers = {},
   backends = {},
   defaults = {
@@ -125,18 +128,20 @@ local M = {
 }
 
 function M:validate()
+  local logger =
+    Logger:new { log_level = self.log_level or vim.log.levels.error }
   local function do_validate()
     -- Must have a default backend name.
     if not self.default_backend_name then
-      Utils:log_error 'No default backend configured.'
+      logger:log_error 'No default backend configured.'
     end
     -- Must have at least one configured backend.
     if not self.backends or vim.tbl_isempty(self.backends) then
-      Utils:log_error 'No backends configured.'
+      logger:log_error 'No backends configured.'
     end
     -- The default backend must be configured.
     if not self.backends[self.default_backend_name] then
-      Utils:log_error(
+      logger:log_error(
         'Default backend ('
           .. self.default_backend_name
           .. ') is not among configured backends ('
@@ -146,15 +151,15 @@ function M:validate()
     end
     -- Must have a default prompt name.
     if not self.default_prompt_name then
-      Utils:log_error 'No default backend configured.'
+      logger:log_error 'No default backend configured.'
     end
     -- Must have at least one configured prompt.
     if not self.backends or vim.tbl_isempty(self.prompts) then
-      Utils:log_error 'No prompts configured.'
+      logger:log_error 'No prompts configured.'
     end
     -- The default prompt must be configured.
     if not self.prompts[self.default_prompt_name] == nil then
-      Utils:log_error(
+      logger:log_error(
         'Default prompt ('
           .. self.default_prompt_name
           .. ') is not among configured prompts ('
@@ -164,7 +169,7 @@ function M:validate()
     end
   end
   if not pcall(do_validate) then
-    Utils:log_error 'Configuration error. Please check your setup.'
+    logger:log_error 'Configuration error. Please check your setup.'
     return
   end
 end

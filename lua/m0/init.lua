@@ -1,25 +1,26 @@
----@class Backend
----@field opts M0.BackendOptions
----@field run fun(): nil
-
----@class State
----@field backend Backend?
----@field prompt string?
----@field prompt_name string?
----@field scan_project boolean?
----@field project_context string?
+local Logger = require 'm0.logger'
 
 ---@type M0.APIFactory
 local APIFactory = require 'm0.apifactory'
-
----@type M0.Utils
-local Utils = require 'm0.utils'
 
 ---@type M0.ScanProject
 local ScanProject = require 'm0.scanproject'
 
 ---@type M0.Selector
 local Selector = require 'm0.selector'
+
+---@class Backend
+---@field opts M0.BackendOptions
+---@field run fun(): nil
+
+---@class State
+---@field log_level integer?
+---@field logger M0.Logger?
+---@field backend Backend?
+---@field prompt string?
+---@field prompt_name string?
+---@field scan_project boolean?
+---@field project_context string?
 
 local M = {
   ---@type State
@@ -65,7 +66,7 @@ local function make_backend(API, msg_buf, opts, state)
         -- The streaming callback appends the reply to the current buffer.
         curl_opts.stream = vim.schedule_wrap(function(err, out, _)
           if err then
-            Utils:log_error('Stream error (1): ' .. err)
+            M.State.logger:log_error('Stream error (1): ' .. err)
             return
           end
           local event, d = API:get_delta_text(out)
@@ -75,11 +76,11 @@ local function make_backend(API, msg_buf, opts, state)
             msg_buf:set_last_line(msg_buf:get_last_line() .. d)
           elseif event == 'other' and d ~= '' then
             -- Could be an error.
-            Utils:log_info(d)
+            M.State.logger:log_info(d)
           elseif event == 'done' then
             msg_buf:close_section()
           else
-            -- Utils:log_info(
+            -- M.State.logger:log_info(
             --   'Other stream results (1): [' .. event .. '][' .. d .. ']'
             -- )
             -- Cruft or no data.
@@ -105,7 +106,9 @@ local function make_backend(API, msg_buf, opts, state)
       if
         not response or (response.status ~= nil and response.status ~= 200)
       then
-        Utils:log_error('Failed to obtain response: ' .. vim.inspect(response))
+        M.State.logger:log_error(
+          'Failed to obtain response: ' .. vim.inspect(response)
+        )
         return
       end
     end,
@@ -154,7 +157,7 @@ function M:M0backend(backend_name)
   ---@type M0.LLMAPI?
   local API = APIFactory.create(backend_opts.api_type, backend_opts, M.State)
   if not API then
-    Utils:log_error('Unable create API for ' .. backend_opts.api_type)
+    M.State.logger:log_error('Unable create API for ' .. backend_opts.api_type)
     return
   end
 
@@ -193,6 +196,13 @@ end
 function M.setup(user_config)
   -- Merge user configuration, overriding defaults.
   M.Config = vim.tbl_extend('force', M.Config, user_config or {})
+
+  -- Init the backend logger
+  -- FIXME: move this up to caller.
+  M.State.log_level = M.Config.log_level or vim.log.levels.INFO
+  M.State.logger = Logger:new {
+    log_level = M.State.log_level,
+  }
 
   -- Sanity checks.
   M.Config:validate()

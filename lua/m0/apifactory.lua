@@ -3,7 +3,6 @@ local M = {}
 
 local Anthropic = require 'm0.anthropic'
 local OpenAI = require 'm0.openai'
-local Utils = require 'm0.utils'
 
 local APIHandlers = {
   anthropic = Anthropic,
@@ -17,7 +16,9 @@ local APIHandlers = {
 function M.create(api_type, opts, state)
   local APIHandler = APIHandlers[api_type]
   if not APIHandler then
-    Utils:log_error('Unsupported API type: ' .. api_type)
+    local msg = 'Unsupported API type: ' .. api_type
+    state.logger.log_error(msg)
+    error(msg)
   end
   return APIHandler:new(opts, state)
 end

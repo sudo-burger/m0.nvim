@@ -40,9 +40,7 @@ function M:get_visual_selection()
   )
 end
 
---- Get messages from current buffer.
---- Transform the chat text into a list of 'messages'.
---- Every section mark is interpreted as the start of a new message.
+--- Get messages from current buffer, generating a list of 'messages'.
 ---@return RawMessage[]
 function M:get_messages()
   self.buf_id = vim.api.nvim_get_current_buf()
@@ -52,8 +50,9 @@ function M:get_messages()
   local conversation = nil
 
   local mode = vim.api.nvim_get_mode().mode
+  -- If we are in visual mode, read the conversation from the visual selection.
+  -- Otherwise use the whole current buffer as input.
   if mode == 'v' or mode == 'V' then
-    -- Read the conversation from the visual selection.
     conversation = self:get_visual_selection()
   else
     -- Read the conversation from the current buffer.

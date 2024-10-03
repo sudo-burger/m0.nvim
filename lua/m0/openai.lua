@@ -74,14 +74,12 @@ end
 function M:get_response_text(data)
   local j = Utils:json_decode(data)
   if j.choices == nil then
-    Utils:log_error('Received: ' .. data)
     return
   end
   return j.choices[1].message.content
 end
 
 function M:get_delta_text(body)
-  print('DEBUG: ' .. body)
   if string.find(body, '^data: ') ~= nil then
     -- The redundant packet '[DONE]' used by the OpenAI API.
     if body == 'data: [DONE]' then

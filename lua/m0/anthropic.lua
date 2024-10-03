@@ -95,7 +95,6 @@ end
 function M:get_response_text(data)
   local j = Utils:json_decode(data)
   if j.content == nil then
-    Utils:log_error('Received: ' .. data)
     return
   end
   return j.content[1].text

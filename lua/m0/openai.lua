@@ -94,39 +94,39 @@ function M:get_response_text(data)
 end
 
 function M:get_delta_text(body)
-  if string.find(body, '^data: ') ~= nil then
-    -- The OpenAI API streaming calls end with this non-JSON message.
-    if body == 'data: [DONE]' then
-      return 'done', body
-    end
+  self.state.logger:log_trace(body)
+  -- The OpenAI API streaming calls end with this non-JSON message.
+  if body == 'data: [DONE]' then
+    return 'done', body
+  end
+  if string.find(body, '^data: ') then
     local json_data = Utils:json_decode(string.sub(body, 7))
-    if json_data.usage ~= vim.NIL then
-      self.state.logger:log_debug(vim.inspect(json_data.usage))
-    end
-    if
-      -- Unexpected data? Return for debugging purposes.
-      json_data == nil
-      or json_data.object ~= 'chat.completion.chunk'
-      or not (
-        json_data.choices
-        and json_data.choices[1]
-        and json_data.choices[1].delta
-        and json_data.choices[1].delta.content
-      )
-    then
+    if not json_data then
+      self.state.logger:log_error('Unable to decode: ' .. body)
       return 'cruft', body
     end
-    if json_data.choices[1].delta.content ~= nil then
+
+    -- Print usage stats.
+    if json_data.usage and json_data.usage ~= vim.NIL then
+      self.state.logger:log_debug(vim.inspect(json_data.usage))
+      return 'cruft', body
+    end
+
+    -- Handle the actual delta.
+    if
+      json_data.object
+      and json_data.object == 'chat.completion.chunk'
+      and json_data.choices
+      and json_data.choices ~= {}
+      and json_data.choices[1].delta
+      and json_data.choices[1].delta ~= vim.empty_dict()
+      and json_data.choices[1].delta.content
+      and json_data.choices[1].delta.content ~= vim.NIL
+    then
       return 'delta', json_data.choices[1].delta.content
     end
-    -- The last delta message in an OpenAI streaming response,
-    -- but more messages may come later, e.g. if we requested stats,
-    -- so we aren't done yet.
-    if json_data.choices[1].finish_reason == 'stop' then
-      return 'cruft', body
-    end
   end
-  -- Anything we don't expect?
+  -- Anything else.
   return 'cruft', body
 end
 

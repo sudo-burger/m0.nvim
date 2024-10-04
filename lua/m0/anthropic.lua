@@ -101,24 +101,38 @@ function M:get_response_text(data)
 end
 
 function M:get_delta_text(body)
-  if body == 'event: message_stop' then
-    return 'done', body
-  end
-  if string.find(body, '^data: ') ~= nil then
-    -- We are in a 'data: ' package now.
-    -- Extract and return the text payload.
-    --
+  self.state.logger:log_trace(body)
+  if string.find(body, '^data: ') then
     local json_data = Utils:json_decode(string.sub(body, 7))
+    if not json_data or not json_data.type then
+      self.state.logger:log_error('Unable to decode: ' .. body)
+      return 'cruft', body
+    end
+
     if
-      json_data ~= nil
-      and json_data.type == 'content_block_delta'
-      and json_data.delta.text ~= nil
+      json_data.type == 'content_block_delta'
+      and json_data.delta
+      and json_data.delta ~= vim.empty_dict()
+      and json_data.delta.text
+      and json_data.delta.text ~= vim.NIL
     then
       return 'delta', json_data.delta.text
     end
+
+    if json_data.type == 'message_stop' then
+      return 'done', body
+    end
+
+    -- Print usage stats.
+    if
+      json_data.type == 'message_delta'
+      and json_data.usage ~= vim.empty_dict()
+    then
+      self.state.logger:log_debug(vim.inspect(json_data.usage))
+      return 'cruft', body
+    end
   end
-  -- Not data, so most likely metadata that we only would want to see for
-  -- debugging purposes.
+  -- Anything else.
   return 'cruft', body
 end
 

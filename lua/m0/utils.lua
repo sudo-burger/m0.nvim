@@ -13,11 +13,7 @@
 local M = {}
 
 function M:safe_call(func, ...)
-  local success, result = pcall(func, ...)
-  if not success then
-    -- FIXME:
-    vim.notify('Error: ' .. tostring(result), vim.log.levels.ERROR)
-  end
+  local _, result = pcall(func, ...)
   return result
 end
 

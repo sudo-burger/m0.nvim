@@ -103,13 +103,12 @@ function M:set_last_line(txt)
 end
 
 --- Open/close a chat sections.
---- FIX: the same action is take to open/close sections at the moment. We may want to differntiate the markers.
+--- FIX: the same marker opens/closes sections at the moment.
+--- We may want different markers.
 function M:open_section()
-  -- Append a section mark.
   self:append_lines { self.opts.section_mark, '' }
 end
 function M:close_section()
-  -- Append a section mark.
   self:append_lines { self.opts.section_mark, '' }
 end
 

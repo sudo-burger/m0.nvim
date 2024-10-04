@@ -167,7 +167,7 @@ function M:validate()
         .. ')'
     )
   end
-  if errors ~= {} then
+  if next(errors) ~= nil then
     return false, vim.inspect(errors)
   end
   return true, ''

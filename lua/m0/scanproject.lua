@@ -115,6 +115,6 @@ learning.]]
       .. '\n</file>\n'
   end
   project = project .. '</project>\n'
-  return string.format(context, project)
+  return true, string.format(context, project)
 end
 return M

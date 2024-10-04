@@ -48,7 +48,7 @@ local function make_backend(API, msg_buf, opts, state)
       if state.scan_project == true then
         -- If a scan of the project has been requested, it should make sense
         -- to re-scan on every turn, to catch code changes.
-        -- FIXME: don't assume that the current working directory is project's root.
+        -- FIXME: don't assume that cwd is project's root.
         local success, context = ScanProject:get_context(vim.fn.getcwd())
         if not success then
           state.logger:log_error(context)
@@ -71,7 +71,7 @@ local function make_backend(API, msg_buf, opts, state)
         -- The streaming callback appends the reply to the current buffer.
         curl_opts.stream = vim.schedule_wrap(function(err, out, _)
           if err then
-            M.State.logger:log_error('Stream error (1): ' .. err)
+            state.logger:log_error('Stream error (1): ' .. err)
             return
           end
           local event, d = API:get_delta_text(out)
@@ -81,11 +81,11 @@ local function make_backend(API, msg_buf, opts, state)
             msg_buf:set_last_line(msg_buf:get_last_line() .. d)
           elseif event == 'other' and d ~= '' then
             -- Could be an error.
-            M.State.logger:log_info(d)
+            state.logger:log_info(d)
           elseif event == 'done' then
             msg_buf:close_section()
           else
-            -- M.State.logger:log_info(
+            -- state.logger:log_info(
             --   'Other stream results (1): [' .. event .. '][' .. d .. ']'
             -- )
             -- Cruft or no data.
@@ -111,7 +111,7 @@ local function make_backend(API, msg_buf, opts, state)
       if
         not response or (response.status ~= nil and response.status ~= 200)
       then
-        M.State.logger:log_error(
+        state.logger:log_error(
           'Failed to obtain response: ' .. vim.inspect(response)
         )
         return
@@ -166,6 +166,7 @@ function M:M0backend(backend_name)
     return
   end
 
+  -- FIXME: constructor, maybe?
   M.State.backend = make_backend(API, msg_buf, backend_opts, M.State)
 end
 
@@ -203,7 +204,6 @@ function M.setup(user_config)
   M.Config = vim.tbl_extend('force', M.Config, user_config or {})
 
   -- Init the backend logger
-  -- FIXME: move this up to caller.
   M.State.log_level = M.Config.log_level or vim.log.levels.INFO
   M.State.logger = Logger:new {
     log_level = M.State.log_level,

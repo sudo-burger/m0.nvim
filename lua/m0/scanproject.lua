@@ -1,5 +1,5 @@
 ---@class M0.ScanProject
----@field get_context fun(self:M0.ScanProject, dir: string):string
+---@field get_context fun(self:M0.ScanProject, dir: string):boolean,string
 
 ---@type M0.ScanProject
 ---@diagnostic disable-next-line: missing-fields
@@ -16,12 +16,11 @@ end
 
 --- Create a 'project context' (in practice a concatenation of the project files.)
 ---@param dir string The directory where the project lives.
----@return string The 'context'
+---@return boolean success, string The 'context' or error message.
 function M:get_context(dir)
   --- Refuse to continue if 'dir' is not a .git repository.
   if require('plenary.path'):new(dir .. '/.git'):is_dir() == false then
-    require('m0.utils'):log_info('Not .git in ' .. dir .. '; refusing to scan.')
-    return ''
+    return false, 'Not .git in ' .. dir .. '; refusing to scan.'
   end
   local context = [[
 In addition to your previous instructions, if any, you are now tra

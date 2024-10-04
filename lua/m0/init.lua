@@ -48,8 +48,13 @@ local function make_backend(API, msg_buf, opts, state)
       if state.scan_project == true then
         -- If a scan of the project has been requested, it should make sense
         -- to re-scan on every turn, to catch code changes.
-        -- FIXME: assume that the current working directory is the root of the project.
-        M.State.project_context = ScanProject:get_context(vim.fn.getcwd())
+        -- FIXME: don't assume that the current working directory is project's root.
+        local success, context = ScanProject:get_context(vim.fn.getcwd())
+        if not success then
+          state.logger:log_error(context)
+        else
+          state.project_context = context
+        end
       end
 
       local body = API:make_body()

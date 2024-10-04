@@ -50,7 +50,7 @@ local Logger = require 'm0.logger'
 ---@field log_level? integer See vim.log.loglevel
 ---@field default_backend_name? string
 ---@field default_prompt_name? string
----@field validate? fun(self:M0.Config):any
+---@field validate? fun(self:M0.Config, logger:M0.Logger):any
 
 ---@type M0.Config
 local M = {
@@ -127,9 +127,7 @@ local M = {
   section_mark = '-------',
 }
 
-function M:validate()
-  local logger =
-    Logger:new { log_level = self.log_level or vim.log.levels.error }
+function M:validate(logger)
   local function do_validate()
     -- Must have a default backend name.
     if not self.default_backend_name then

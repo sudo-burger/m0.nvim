@@ -50,7 +50,7 @@ local Logger = require 'm0.logger'
 ---@field log_level? integer See vim.log.loglevel
 ---@field default_backend_name? string
 ---@field default_prompt_name? string
----@field validate? fun(self:M0.Config, logger:M0.Logger):any
+---@field validate? fun(self:M0.Config):boolean,string
 
 ---@type M0.Config
 local M = {
@@ -127,49 +127,50 @@ local M = {
   section_mark = '-------',
 }
 
-function M:validate(logger)
-  local function do_validate()
-    -- Must have a default backend name.
-    if not self.default_backend_name then
-      logger:log_error 'No default backend configured.'
-    end
-    -- Must have at least one configured backend.
-    if not self.backends or vim.tbl_isempty(self.backends) then
-      logger:log_error 'No backends configured.'
-    end
-    -- The default backend must be configured.
-    if not self.backends[self.default_backend_name] then
-      logger:log_error(
-        'Default backend ('
-          .. self.default_backend_name
-          .. ') is not among configured backends ('
-          .. vim.inspect(self.backends)
-          .. ')'
-      )
-    end
-    -- Must have a default prompt name.
-    if not self.default_prompt_name then
-      logger:log_error 'No default backend configured.'
-    end
-    -- Must have at least one configured prompt.
-    if not self.backends or vim.tbl_isempty(self.prompts) then
-      logger:log_error 'No prompts configured.'
-    end
-    -- The default prompt must be configured.
-    if not self.prompts[self.default_prompt_name] == nil then
-      logger:log_error(
-        'Default prompt ('
-          .. self.default_prompt_name
-          .. ') is not among configured prompts ('
-          .. vim.inspect(self.prompts)
-          .. ')'
-      )
-    end
+function M:validate()
+  local errors = {}
+  -- Must have a default backend name.
+  if not self.default_backend_name then
+    table.insert(errors, 'No default backend configured.')
   end
-  if not pcall(do_validate) then
-    logger:log_error 'Configuration error. Please check your setup.'
-    return
+  -- Must have at least one configured backend.
+  if not self.backends or vim.tbl_isempty(self.backends) then
+    table.insert(errors, 'No backends configured.')
   end
+  -- The default backend must be configured.
+  if not self.backends[self.default_backend_name] then
+    table.insert(
+      errors,
+      'Default backend ('
+        .. self.default_backend_name
+        .. ') is not among configured backends ('
+        .. vim.inspect(self.backends)
+        .. ')'
+    )
+  end
+  -- Must have a default prompt name.
+  if not self.default_prompt_name then
+    table.insert(errors, 'No default backend configured.')
+  end
+  -- Must have at least one configured prompt.
+  if not self.backends or vim.tbl_isempty(self.prompts) then
+    table.insert(errors, 'No prompts configured.')
+  end
+  -- The default prompt must be configured.
+  if not self.prompts[self.default_prompt_name] == nil then
+    table.insert(
+      errors,
+      'Default prompt ('
+        .. self.default_prompt_name
+        .. ') is not among configured prompts ('
+        .. vim.inspect(self.prompts)
+        .. ')'
+    )
+  end
+  if errors ~= {} then
+    return false, vim.inspect(errors)
+  end
+  return true, ''
 end
 
 return M

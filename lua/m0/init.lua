@@ -210,7 +210,11 @@ function M.setup(user_config)
   }
 
   -- Sanity checks.
-  M.Config:validate()
+  local success, error = M.Config:validate()
+  if not success then
+    M.State.logger:log_error(error)
+    return
+  end
 
   -- Activate defaults.
   M:M0prompt(M.Config.default_prompt_name)

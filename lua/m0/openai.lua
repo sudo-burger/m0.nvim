@@ -79,10 +79,11 @@ function M:get_messages(raw_messages)
 end
 
 function M:get_response_text(data)
-  local json = Utils:json_decode(data)
+  local success, json = Utils:json_decode(data)
   if
     not (
-      json
+      success
+      and json
       and json.choices
       and json.choices[1]
       and json.choices[1].message
@@ -101,9 +102,9 @@ function M:get_delta_text(body)
   if body == 'data: [DONE]' then
     return 'done', body
   end
-  if string.find(body, '^data: ') then
-    local json = Utils:json_decode(string.sub(body, 7))
-    if not json then
+  if body and string.find(body, '^data: ') then
+    local success, json = Utils:json_decode(string.sub(body, 7))
+    if not success and json then
       return 'error', 'Unable to decode: ' .. body
     end
 

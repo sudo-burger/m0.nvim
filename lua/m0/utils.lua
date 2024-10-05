@@ -7,8 +7,7 @@
 local M = {}
 
 function M:safe_call(func, ...)
-  local _, result = pcall(func, ...)
-  return result
+  return pcall(func, ...)
 end
 
 --- Safe json_decode.

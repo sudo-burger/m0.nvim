@@ -89,11 +89,9 @@ local function make_backend(API, msg_buf, opts, state)
           -- When streaming, it seems the best chance to catch an API error
           -- is to parse stdout.
           if _job._stdout_results ~= {} then
-            local json = Utils:json_decode(_job._stdout_results)
-            if json and json.error then
-              state.logger:log_error(
-                'Stream error: [' .. vim.inspect(json) .. ']'
-              )
+            local success, json = Utils:json_decode(_job._stdout_results)
+            if success and json and json.error then
+              M.Logger:log_error('Stream error: [' .. vim.inspect(json) .. ']')
               return
             end
           end

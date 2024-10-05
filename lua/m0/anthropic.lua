@@ -5,7 +5,8 @@ local Utils = require 'm0.utils'
 
 ---@class M0.AnthropicMessage
 ---@field role string
----@field content string
+---@field content string|table
+---@field cache_control? table
 
 ---@class M0.Anthropic:M0.LLMAPI
 ---@field new fun(self:M0.LLMAPI, backend_opts:M0.BackendOptions, state: table):M0.LLMAPI
@@ -72,8 +73,6 @@ end
 function M:get_messages(raw_messages)
   ---@type M0.AnthropicMessage[]
   local messages = {}
-  local role = 'user'
-  local i = 1
 
   -- If we are scanning the project but don't have access to caching
   -- (given by the Anthropic beta feature), pass the scan as a user message.
@@ -84,10 +83,36 @@ function M:get_messages(raw_messages)
     )
   end
 
+  -- The initial message is assumed to be by the user.
+  local role = 'user'
+  local i = 1
   while i <= #raw_messages do
     table.insert(messages, { role = role, content = raw_messages[i] })
     role = role == 'user' and 'assistant' or 'user'
     i = i + 1
+  end
+
+  -- FIXME: should explicitly test for the caching feature.
+  if self.opts.anthropic_beta then
+    -- User turns processed counter used to drive prompt caching.
+    -- See: https://github.com/anthropics/anthropic-cookbook/blob/main/misc/prompt_caching.ipynb
+    -- Anthropic's suggestion is to "Add the last two user turns with ephemeral cache control."
+    local user_messages_processed = 0
+    i = #messages
+    while i > 0 and user_messages_processed < 2 do
+      if messages[i].role == 'user' then
+        local text = messages[i].content
+        messages[i].content = {
+          {
+            type = 'text',
+            text = text,
+            cache_control = { type = 'ephemeral' },
+          },
+        }
+        user_messages_processed = user_messages_processed + 1
+      end
+      i = i - 1
+    end
   end
   return messages
 end

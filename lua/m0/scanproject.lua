@@ -6,12 +6,16 @@
 local M = {}
 
 local function read_file(path)
-  local file = assert(io.open(path, 'r'))
-  ---@diagnostic disable-next-line: need-check-nil
-  local contents = assert(file:read '*all')
-  ---@diagnostic disable-next-line: need-check-nil
+  local file, err = io.open(path, 'r')
+  if not file then
+    return false, err
+  end
+  local contents, err = file:read '*all'
+  if not contents then
+    return false, err
+  end
   file:close()
-  return contents
+  return true, contents
 end
 
 --- Create a 'project context' (in practice a concatenation of the project files.)
@@ -107,11 +111,15 @@ learning.]]
   local project = '<project>\n'
   local files = require('plenary.scandir').scan_dir(dir)
   for _, f in pairs(files) do
+    local success, contents = read_file(f)
+    if not success then
+      return false, contents
+    end
     project = project
       .. '<file name="'
       .. f
       .. '">\n'
-      .. read_file(f)
+      .. contents
       .. '\n</file>\n'
   end
   project = project .. '</project>\n'

@@ -3,9 +3,6 @@ local Logger = require 'm0.logger'
 ---@type M0.APIFactory
 local APIFactory = require 'm0.apifactory'
 
----@type M0.ScanProject
-local ScanProject = require 'm0.scanproject'
-
 ---@type M0.Selector
 local Selector = require 'm0.selector'
 

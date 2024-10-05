@@ -12,15 +12,18 @@ local APIHandlers = {
 ---@param api_type api_type
 ---@param opts M0.BackendOptions
 ---@param state table reference to current state.
----@return M0.LLMAPI?
+---@return boolean, M0.LLMAPI?
 function M.create(api_type, opts, state)
   local APIHandler = APIHandlers[api_type]
   if not APIHandler then
-    local msg = 'Unsupported API type: ' .. api_type
-    state.logger.log_error(msg)
-    error(msg)
+    return false, 'Unsupported API type: ' .. api_type
   end
-  return APIHandler:new(opts, state)
+  local instance = APIHandler:new(opts, state)
+  if not instance then
+    return false, 'Failed to create handler for ' .. api_type
+  end
+
+  return true, instance
 end
 
 return M

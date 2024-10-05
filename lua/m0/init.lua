@@ -189,10 +189,13 @@ function M:M0backend(backend_name)
     { name = backend_name }
   )
 
-  ---@type M0.LLMAPI?
-  local API = APIFactory.create(backend_opts.api_type, backend_opts, M.State)
-  if not API then
-    M.State.logger:log_error('Unable create API for ' .. backend_opts.api_type)
+  ---@type boolean,M0.LLMAPI?
+  local success, API =
+    APIFactory.create(backend_opts.api_type, backend_opts, M.State)
+  if not success then
+    self.Logger:log_error(
+      'Unable create API for ' .. backend_opts.api_type .. ': ' .. (API or '')
+    )
     return
   end
 

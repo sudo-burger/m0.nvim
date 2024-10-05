@@ -79,21 +79,21 @@ function M:get_messages(raw_messages)
 end
 
 function M:get_response_text(data)
-  local j = Utils:json_decode(data)
+  local json = Utils:json_decode(data)
   if
     not (
-      j
-      and j.choices
-      and j.choices[1]
-      and j.choices[1].message
-      and j.choices[1].message.content
-      and j.choices[1].message.content
-      and j.usage
+      json
+      and json.choices
+      and json.choices[1]
+      and json.choices[1].message
+      and json.choices[1].message ~= vim.empty_dict()
+      and json.choices[1].message.content
+      and json.usage
     )
   then
     return false, 'Unable to decode: ' .. data, nil
   end
-  return true, j.choices[1].message.content, vim.inspect(j.usage)
+  return true, json.choices[1].message.content, vim.inspect(json.usage)
 end
 
 function M:get_delta_text(body)
@@ -102,29 +102,29 @@ function M:get_delta_text(body)
     return 'done', body
   end
   if string.find(body, '^data: ') then
-    local json_data = Utils:json_decode(string.sub(body, 7))
-    if not json_data then
+    local json = Utils:json_decode(string.sub(body, 7))
+    if not json then
       return 'error', 'Unable to decode: ' .. body
     end
 
     -- Handle the actual delta.
     if
-      json_data.object
-      and json_data.object == 'chat.completion.chunk'
-      and json_data.choices
-      and json_data.choices ~= {}
-      and json_data.choices[1]
-      and json_data.choices[1].delta
-      and json_data.choices[1].delta ~= vim.empty_dict()
-      and json_data.choices[1].delta.content
-      and json_data.choices[1].delta.content ~= vim.NIL
+      json.object
+      and json.object == 'chat.completion.chunk'
+      and json.choices
+      and json.choices ~= {}
+      and json.choices[1]
+      and json.choices[1].delta
+      and json.choices[1].delta ~= vim.empty_dict()
+      and json.choices[1].delta.content
+      and json.choices[1].delta.content ~= vim.NIL
     then
-      return 'delta', json_data.choices[1].delta.content
+      return 'delta', json.choices[1].delta.content
     end
 
     -- Print usage stats.
-    if json_data.usage and json_data.usage ~= vim.NIL then
-      return 'stats', vim.inspect(json_data.usage)
+    if json.usage and json.usage ~= vim.NIL then
+      return 'stats', vim.inspect(json.usage)
     end
   end
   -- Anything else.

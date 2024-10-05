@@ -9,6 +9,9 @@ local ScanProject = require 'm0.scanproject'
 ---@type M0.Selector
 local Selector = require 'm0.selector'
 
+---@type M0.Utils
+local Utils = require 'm0.utils'
+
 ---@class Backend
 ---@field opts M0.BackendOptions
 ---@field run fun(): nil
@@ -68,19 +71,36 @@ local function make_backend(API, msg_buf, opts, state)
 
       -- Different callbacks needed, depending on whether streaming is enabled or not.
       if opts.stream == true then
-        -- The streaming callback appends the reply to the current buffer.
-        curl_opts.stream = vim.schedule_wrap(function(err, out, _)
+        curl_opts.stream = vim.schedule_wrap(function(err, out, _job)
+          state.logger:log_trace(
+            'Err: '
+              .. (err or '')
+              .. '\nOut: '
+              .. (out or '')
+              .. '\nJob: '
+              .. vim.inspect(_job)
+          )
           if err then
             state.logger:log_error(
-              'Stream error (1): [' .. err .. '] [' .. out .. ']'
+              'Stream error: [' .. err .. '] [' .. out .. ']'
             )
             return
           end
-          state.logger:log_trace(out)
-          local event, d = API:get_delta_text(out)
+          -- When streaming, it seems the best chance to catch an API error
+          -- is to parse stdout.
+          if _job._stdout_results ~= {} then
+            local json = Utils:json_decode(_job._stdout_results)
+            if json and json.error then
+              state.logger:log_error(
+                'Stream error: [' .. vim.inspect(json) .. ']'
+              )
+              return
+            end
+          end
 
+          local event, d = API:get_delta_text(out)
           if event == 'delta' then
-            -- Add the delta to the current line.
+            -- Append the delta to the current line.
             msg_buf:set_last_line(msg_buf:get_last_line() .. d)
           elseif event == 'error' then
             state.logger:log_error(d)
@@ -88,20 +108,26 @@ local function make_backend(API, msg_buf, opts, state)
             state.logger:log_info(d)
           elseif event == 'done' then
             msg_buf:close_section()
-          else
-            state.logger:log_trace(
-              'Other stream results: [' .. event .. '][' .. d .. ']'
-            )
+          elseif d then
+            state.logger:log_trace('Unhandled stream results: ' .. d)
           end
         end)
       else
         -- Not streaming.
         -- We append the LLM's reply to the current buffer at one go.
         curl_opts.callback = vim.schedule_wrap(function(out)
-          state.logger:log_trace(out.body)
+          state.logger:log_trace(vim.inspect(out))
+          if out and out.status and (out.status < 200 or out.status > 299) then
+            state.logger:log_error('Error in response: ' .. vim.inspect(out))
+            return
+          end
+
           local success, response, stats = API:get_response_text(out.body)
           if not success then
-            state.logger:log_error('Failed to get response: ' .. out.body)
+            state.logger:log_error(
+              'Failed to parse response: ' .. vim.inspect(out)
+            )
+            return
           end
           if response then
             msg_buf:set_last_line(response)
@@ -116,13 +142,10 @@ local function make_backend(API, msg_buf, opts, state)
       -- The closing section mark is printed by the curl callbacks.
       msg_buf:open_section()
       local response = require('plenary.curl').post(opts.url, curl_opts)
-      if
-        not response or (response.status ~= nil and response.status ~= 200)
-      then
-        state.logger:log_error(
-          'Failed to obtain response: ' .. vim.inspect(response)
-        )
-        return
+      if not response then
+        state.logger:log_error 'Failed to obtain CuRL response.'
+      else
+        state.logger:log_trace('CuRL response: ' .. vim.inspect(response))
       end
     end,
   }

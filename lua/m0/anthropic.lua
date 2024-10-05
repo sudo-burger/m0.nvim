@@ -94,14 +94,16 @@ end
 
 function M:get_response_text(data)
   local j = Utils:json_decode(data)
-  if j.content == nil then
-    return
+  if not j or not j.content then
+    return false, 'Unable to decode: ' .. data, nil
   end
-  return j.content[1].text
+  if not (j.content and j.content[1] and j.content[1].text) then
+    return false, nil, nil
+  end
+  return true, j.content[1].text, vim.inspect(j.usage)
 end
 
 function M:get_delta_text(body)
-  self.state.logger:log_trace(body)
   if string.find(body, '^data: ') then
     local json_data = Utils:json_decode(string.sub(body, 7))
     if not json_data or not json_data.type then

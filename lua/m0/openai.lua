@@ -82,19 +82,21 @@ function M:get_response_text(data)
   local j = Utils:json_decode(data)
   if
     not (
-      j.choices
+      j
+      and j.choices
       and j.choices[1]
       and j.choices[1].message
       and j.choices[1].message.content
+      and j.choices[1].message.content
+      and j.usage
     )
   then
-    return
+    return false, 'Unable to decode: ' .. data, nil
   end
-  return j.choices[1].message.content
+  return true, j.choices[1].message.content, vim.inspect(j.usage)
 end
 
 function M:get_delta_text(body)
-  self.state.logger:log_trace(body)
   -- The OpenAI API streaming calls end with this non-JSON message.
   if body == 'data: [DONE]' then
     return 'done', body

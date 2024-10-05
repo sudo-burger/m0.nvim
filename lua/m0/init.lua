@@ -71,9 +71,12 @@ local function make_backend(API, msg_buf, opts, state)
         -- The streaming callback appends the reply to the current buffer.
         curl_opts.stream = vim.schedule_wrap(function(err, out, _)
           if err then
-            state.logger:log_error('Stream error (1): ' .. err)
+            state.logger:log_error(
+              'Stream error (1): [' .. err .. '] [' .. out .. ']'
+            )
             return
           end
+          state.logger:log_trace(out)
           local event, d = API:get_delta_text(out)
 
           if event == 'delta' then
@@ -95,10 +98,16 @@ local function make_backend(API, msg_buf, opts, state)
         -- Not streaming.
         -- We append the LLM's reply to the current buffer at one go.
         curl_opts.callback = vim.schedule_wrap(function(out)
-          -- Build the reply in the message handler.
-          local res = API:get_response_text(out.body)
-          if res then
-            msg_buf:set_last_line(res)
+          state.logger:log_trace(out.body)
+          local success, response, stats = API:get_response_text(out.body)
+          if not success then
+            state.logger:log_error('Failed to get response: ' .. out.body)
+          end
+          if response then
+            msg_buf:set_last_line(response)
+          end
+          if stats then
+            state.logger:log_info(stats)
           end
           msg_buf:close_section()
         end)

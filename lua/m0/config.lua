@@ -54,7 +54,7 @@ local Logger = require 'm0.logger'
 
 ---@type M0.Config
 local M = {
-  log_level = vim.log.levels.INFO,
+  log_level = vim.log.levels.WARN,
   providers = {},
   backends = {},
   defaults = {

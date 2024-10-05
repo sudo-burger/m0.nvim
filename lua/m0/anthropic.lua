@@ -105,8 +105,7 @@ function M:get_delta_text(body)
   if string.find(body, '^data: ') then
     local json_data = Utils:json_decode(string.sub(body, 7))
     if not json_data or not json_data.type then
-      self.state.logger:log_error('Unable to decode: ' .. body)
-      return 'cruft', body
+      return 'error', 'Unable to decode: ' .. body
     end
 
     if
@@ -128,8 +127,7 @@ function M:get_delta_text(body)
       json_data.type == 'message_delta'
       and json_data.usage ~= vim.empty_dict()
     then
-      self.state.logger:log_debug(vim.inspect(json_data.usage))
-      return 'cruft', body
+      return 'stats', vim.inspect(json_data.usage)
     end
   end
   -- Anything else.

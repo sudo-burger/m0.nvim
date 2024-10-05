@@ -1,10 +1,11 @@
 require 'm0.message'
 
 ---@alias DeltaEventType
----| "delta" # the server sent a text delta
----| "cruft" # the server sent data we consider to be cruft
----| "done" # the server signaled that the text transfer is done.
----| "other" # we received something we cannot interpret.
+---| "cruft" # we received data we will not parse.
+---| "delta" # we received a delta.
+---| "done" # the call is done.
+---| "error" # we received something we cannot parse.
+---| "stats" # we received statistics.
 
 ---Abstract class for LLM APIs.
 ---@class M0.LLMAPI

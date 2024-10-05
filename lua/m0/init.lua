@@ -76,20 +76,19 @@ local function make_backend(API, msg_buf, opts, state)
           end
           local event, d = API:get_delta_text(out)
 
-          if event == 'delta' and d ~= '' then
+          if event == 'delta' then
             -- Add the delta to the current line.
             msg_buf:set_last_line(msg_buf:get_last_line() .. d)
-          elseif event == 'other' and d ~= '' then
-            -- Could be an error.
+          elseif event == 'error' then
+            state.logger:log_error(d)
+          elseif event == 'stats' then
             state.logger:log_info(d)
           elseif event == 'done' then
             msg_buf:close_section()
           else
-            -- state.logger:log_info(
-            --   'Other stream results (1): [' .. event .. '][' .. d .. ']'
-            -- )
-            -- Cruft or no data.
-            return
+            state.logger:log_trace(
+              'Other stream results: [' .. event .. '][' .. d .. ']'
+            )
           end
         end)
       else

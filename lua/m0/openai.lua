@@ -102,14 +102,7 @@ function M:get_delta_text(body)
   if string.find(body, '^data: ') then
     local json_data = Utils:json_decode(string.sub(body, 7))
     if not json_data then
-      self.state.logger:log_error('Unable to decode: ' .. body)
-      return 'cruft', body
-    end
-
-    -- Print usage stats.
-    if json_data.usage and json_data.usage ~= vim.NIL then
-      self.state.logger:log_debug(vim.inspect(json_data.usage))
-      return 'cruft', body
+      return 'error', 'Unable to decode: ' .. body
     end
 
     -- Handle the actual delta.
@@ -118,12 +111,18 @@ function M:get_delta_text(body)
       and json_data.object == 'chat.completion.chunk'
       and json_data.choices
       and json_data.choices ~= {}
+      and json_data.choices[1]
       and json_data.choices[1].delta
       and json_data.choices[1].delta ~= vim.empty_dict()
       and json_data.choices[1].delta.content
       and json_data.choices[1].delta.content ~= vim.NIL
     then
       return 'delta', json_data.choices[1].delta.content
+    end
+
+    -- Print usage stats.
+    if json_data.usage and json_data.usage ~= vim.NIL then
+      return 'stats', vim.inspect(json_data.usage)
     end
   end
   -- Anything else.

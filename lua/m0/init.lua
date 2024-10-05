@@ -1,3 +1,4 @@
+---@type M0.Logger
 local Logger = require 'm0.logger'
 
 ---@type M0.APIFactory
@@ -15,7 +16,6 @@ local Utils = require 'm0.utils'
 
 ---@class State
 ---@field log_level integer?
----@field logger M0.Logger?
 ---@field backend Backend?
 ---@field prompt string?
 ---@field prompt_name string?
@@ -52,7 +52,7 @@ local function make_backend(API, msg_buf, opts, state)
         local success, context =
           require('m0.scanproject'):get_context(vim.fn.getcwd())
         if not success then
-          state.logger:log_error(context)
+          M.Logger:log_error(context)
         else
           state.project_context = context
         end
@@ -70,7 +70,7 @@ local function make_backend(API, msg_buf, opts, state)
       -- Different callbacks needed, depending on whether streaming is enabled or not.
       if opts.stream == true then
         curl_opts.stream = vim.schedule_wrap(function(err, out, _job)
-          state.logger:log_trace(
+          M.Logger:log_trace(
             'Err: '
               .. (err or '')
               .. '\nOut: '
@@ -79,9 +79,7 @@ local function make_backend(API, msg_buf, opts, state)
               .. vim.inspect(_job)
           )
           if err then
-            state.logger:log_error(
-              'Stream error: [' .. err .. '] [' .. out .. ']'
-            )
+            M.Logger:log_error('Stream error: [' .. err .. '] [' .. out .. ']')
             return
           end
           -- When streaming, it seems the best chance to catch an API error
@@ -99,37 +97,35 @@ local function make_backend(API, msg_buf, opts, state)
             -- Append the delta to the current line.
             msg_buf:set_last_line(msg_buf:get_last_line() .. d)
           elseif event == 'error' then
-            state.logger:log_error(d)
+            M.Logger:log_error(d)
           elseif event == 'stats' then
-            state.logger:log_info(d)
+            M.Logger:log_info(d)
           elseif event == 'done' then
             msg_buf:close_section()
           elseif d then
-            state.logger:log_trace('Unhandled stream results: ' .. d)
+            M.Logger:log_trace('Unhandled stream results: ' .. d)
           end
         end)
       else
         -- Not streaming.
         -- We append the LLM's reply to the current buffer at one go.
         curl_opts.callback = vim.schedule_wrap(function(out)
-          state.logger:log_trace(vim.inspect(out))
+          M.Logger:log_trace(vim.inspect(out))
           if out and out.status and (out.status < 200 or out.status > 299) then
-            state.logger:log_error('Error in response: ' .. vim.inspect(out))
+            M.Logger:log_error('Error in response: ' .. vim.inspect(out))
             return
           end
 
           local success, response, stats = API:get_response_text(out.body)
           if not success then
-            state.logger:log_error(
-              'Failed to parse response: ' .. vim.inspect(out)
-            )
+            M.Logger:log_error('Failed to parse response: ' .. vim.inspect(out))
             return
           end
           if response then
             msg_buf:set_last_line(response)
           end
           if stats then
-            state.logger:log_info(stats)
+            M.Logger:log_info(stats)
           end
           msg_buf:close_section()
         end)
@@ -139,9 +135,9 @@ local function make_backend(API, msg_buf, opts, state)
       msg_buf:open_section()
       local response = require('plenary.curl').post(opts.url, curl_opts)
       if not response then
-        state.logger:log_error 'Failed to obtain CuRL response.'
+        M.Logger:log_error 'Failed to obtain CuRL response.'
       else
-        state.logger:log_trace('CuRL response: ' .. vim.inspect(response))
+        M.Logger:log_trace('CuRL response: ' .. vim.inspect(response))
       end
     end,
   }
@@ -163,11 +159,14 @@ function M:M0backend(backend_name)
     vim.deepcopy(self.Config.defaults.providers[provider_name])
 
   if not backend_opts then
-    error("Backend '" .. backend_name .. "' not in configuration.")
+    self.Logger:log_error(
+      "Backend '" .. backend_name .. "' not in configuration."
+    )
+    return
   end
 
   if not provider_opts then
-    error(
+    self.Logger:log_error(
       "Unable to find provider '"
         .. provider_name
         .. "' for backend '"
@@ -197,7 +196,7 @@ function M:M0backend(backend_name)
   end
 
   -- FIXME: constructor, maybe?
-  M.State.backend = make_backend(API, msg_buf, backend_opts, M.State)
+  self.State.backend = make_backend(API, msg_buf, backend_opts, M.State)
 end
 
 ---Select prompt interactively.
@@ -205,7 +204,10 @@ end
 ---@return nil
 function M:M0prompt(prompt_name)
   if self.Config.prompts[prompt_name] == nil then
-    error("Prompt '" .. prompt_name .. "' not in configuration.")
+    self.Logger:log_error(
+      "Prompt '" .. prompt_name .. "' not in configuration."
+    )
+    return
   end
   self.State.prompt_name = prompt_name
   self.State.prompt = self.Config.prompts[prompt_name]
@@ -234,15 +236,15 @@ function M.setup(user_config)
   M.Config = vim.tbl_extend('force', M.Config, user_config or {})
 
   -- Init the backend logger
-  M.State.log_level = M.Config.log_level or vim.log.levels.INFO
-  M.State.logger = Logger:new {
+  M.State.log_level = M.Config.log_level
+  M.Logger = Logger:new {
     log_level = M.State.log_level,
   }
 
   -- Sanity checks.
   local success, error = M.Config:validate()
   if not success then
-    M.State.logger:log_error(error)
+    M.Logger:log_error(error)
     return
   end
 

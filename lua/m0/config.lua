@@ -1,5 +1,3 @@
-local Logger = require 'm0.logger'
-
 ---@alias anthropic_api_type 'anthropic'
 ---@alias openai_api_type 'openai'
 ---@alias api_type  anthropic_api_type | openai_api_type

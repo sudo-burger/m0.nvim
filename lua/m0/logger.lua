@@ -28,23 +28,23 @@ function M:_logger(level)
 end
 
 function M:log_trace(message)
-  self:_logger(vim.log.levels.TRACE)(message)
+  self:_logger(vim.log.levels.TRACE)('TRACE: ' .. message)
 end
 
 function M:log_debug(message)
-  self:_logger(vim.log.levels.DEBUG)(message)
+  self:_logger(vim.log.levels.DEBUG)('DEBUG: ' .. message)
 end
 
 function M:log_info(message)
-  self:_logger(vim.log.levels.INFO)(message)
+  self:_logger(vim.log.levels.INFO)('INFO: ' .. message)
 end
 
 function M:log_warn(message)
-  self:_logger(vim.log.levels.WARN)(message)
+  self:_logger(vim.log.levels.WARN)('WARN: ' .. message)
 end
 
 function M:log_error(message)
-  self:_logger(vim.log.levels.ERROR)(message)
+  self:_logger(vim.log.levels.ERROR)('ERROR: ' .. message)
 end
 
 return M

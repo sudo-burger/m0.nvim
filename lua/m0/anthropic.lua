@@ -93,43 +93,42 @@ function M:get_messages(raw_messages)
 end
 
 function M:get_response_text(data)
-  local j = Utils:json_decode(data)
-  if not j or not j.content then
-    return false, 'Unable to decode: ' .. data, nil
+  local json = Utils:json_decode(data)
+  if
+    not (json and json.content and json.content[1] and json.content[1].text)
+  then
+    return false, 'Unable to get response: ' .. data, nil
   end
-  if not (j.content and j.content[1] and j.content[1].text) then
-    return false, nil, nil
-  end
-  return true, j.content[1].text, vim.inspect(j.usage)
+  return true, json.content[1].text, vim.inspect(json.usage or '')
 end
 
+-- FIXME: the function processes streaming messages; the name could be
+-- improved. Maybe just "stream()"?
+-- What is the SDK standard, if any?
 function M:get_delta_text(body)
   if string.find(body, '^data: ') then
-    local json_data = Utils:json_decode(string.sub(body, 7))
-    if not json_data or not json_data.type then
+    local json = Utils:json_decode(string.sub(body, 7))
+    if not json or not json.type then
       return 'error', 'Unable to decode: ' .. body
     end
 
     if
-      json_data.type == 'content_block_delta'
-      and json_data.delta
-      and json_data.delta ~= vim.empty_dict()
-      and json_data.delta.text
-      and json_data.delta.text ~= vim.NIL
+      json.type == 'content_block_delta'
+      and json.delta
+      and json.delta ~= vim.empty_dict()
+      and json.delta.text
+      and json.delta.text ~= vim.NIL
     then
-      return 'delta', json_data.delta.text
+      return 'delta', json.delta.text
     end
 
-    if json_data.type == 'message_stop' then
+    if json.type == 'message_stop' then
       return 'done', body
     end
 
     -- Print usage stats.
-    if
-      json_data.type == 'message_delta'
-      and json_data.usage ~= vim.empty_dict()
-    then
-      return 'stats', vim.inspect(json_data.usage)
+    if json.type == 'message_delta' and json.usage ~= vim.empty_dict() then
+      return 'stats', vim.inspect(json.usage)
     end
   end
   -- Anything else.

@@ -6,12 +6,13 @@ require 'm0.message'
 ---@field new? fun(self:M0.VimBuffer, opts:table):M0.VimBuffer
 ---@field get_visual_selection? fun(self:M0.VimBuffer):string[]
 ---@field get_messages? fun(self:M0.VimBuffer):RawMessage[]
----@field append_lines? fun(self:M0.VimBuffer, lines:string[])
----@field get_last_line? fun(self:M0.VimBuffer):string
----@field set_last_line? fun(self:M0.VimBuffer, txt:string)
 ---@field open_response? fun(self:M0.VimBuffer)
 ---@field close_response? fun(self:M0.VimBuffer)
----@field put_response fun(self:M0.VimBuffer, response:string, opts?:table):boolean
+---@field put_response? fun(self:M0.VimBuffer, response:string, opts?:table):boolean
+---@field insert_lines? fun(self:M0.VimBuffer, lines:string[], opts?:table)
+---@field get_last_line? fun(self:M0.VimBuffer):string
+---@field set_last_line? fun(self:M0.VimBuffer, txt:string)
+
 
 ---@type M0.VimBuffer
 local M = {
@@ -88,10 +89,17 @@ function M:get_messages()
   return messages
 end
 
---- Append lines to the end of the buffer.
+--- Insert lines, by default at end of the buffer.
 ---@param lines string[]
-function M:append_lines(lines)
-  vim.api.nvim_buf_set_lines(self.buf_id, -1, -1, false, lines)
+function M:insert_lines(lines, opts)
+  local start_line = -1
+  local end_line = -1
+
+  if opts and opts.start_line and opts.end_line then
+    start_line = opts.start_line
+    end_line = opts.end_line
+  end
+  vim.api.nvim_buf_set_lines(self.buf_id, start_line, end_line, false, lines)
 end
 
 --- Get the last line of the buffer.
@@ -115,13 +123,11 @@ function M:set_last_line(txt)
 end
 
 --- Open/close a response.
---- FIX: the same marker opens/closes sections at the moment.
---- We may want different markers.
 function M:open_response()
-  self:append_lines { self.opts.section_mark, '' }
+  self:insert_lines { self.opts.section_mark, '' }
 end
 function M:close_response()
-  self:append_lines { self.opts.section_mark, '' }
+  self:insert_lines { self.opts.section_mark, '' }
 end
 
 return M

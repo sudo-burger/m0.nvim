@@ -272,6 +272,12 @@ function M.setup(user_config)
     ':M0 scan_project<CR>',
     { noremap = true, silent = true }
   )
+  vim.keymap.set(
+    { 'n' },
+    '<Plug>(M0 info)',
+    ':M0 info<CR>',
+    { noremap = true, silent = true }
+  )
 
   -- User commands
   -- See: https://github.com/nvim-neorocks/nvim-best-practices?tab=readme-ov-file
@@ -301,6 +307,35 @@ function M.setup(user_config)
     },
     chat = {
       impl = M.M0chat,
+    },
+    info = {
+      impl = function(_, _)
+        local win_width = vim.api.nvim_win_get_width(0)
+        local win_height = vim.api.nvim_win_get_height(0)
+        if win_width < 20 or win_height < 20 then
+          M.Logger:log_warn 'We are in a tight place.'
+          return
+        end
+        local buf_id = vim.api.nvim_create_buf(false, true)
+        vim.api.nvim_buf_set_lines(
+          buf_id,
+          -2,
+          -1,
+          false,
+          -- If the input contains multiple lines,
+          -- split them as required by nvim_buf_get_lines()
+          vim.fn.split(M:debug(), '\n', false)
+        )
+        vim.api.nvim_open_win(buf_id, true, {
+          relative = 'win',
+          row = 5,
+          col = 5,
+          width = win_width - 10,
+          height = win_height - 10,
+          style = 'minimal',
+          border = 'rounded',
+        })
+      end,
     },
     -- What prompt to use.
     prompt = {

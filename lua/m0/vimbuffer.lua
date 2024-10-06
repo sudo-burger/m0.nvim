@@ -72,12 +72,13 @@ function M:get_messages()
     conversation = vim.api.nvim_buf_get_lines(self.buf_id, 0, -1, false)
   end
 
+  -- Iterate through the conversation, transforming the raw text into
+  -- a list of messages.
   local i = 1
-  -- Iterate through the conversation.
   while i <= #conversation do
     local message = ''
-    -- In conversations, the 'user' and AI take turns.
-    -- "Section marks" are used to signal the switches between the two roles.
+    -- "Section marks" are used to signal the switches between the turns.
+    -- Add everything up to the next section mark to the current message.
     while i <= #conversation and conversation[i] ~= section_mark do
       message = message .. conversation[i] .. '\n'
       i = i + 1

@@ -1,5 +1,3 @@
-require 'm0.message'
-
 local LLMAPI = require 'm0.llmapi'
 local Utils = require 'm0.utils'
 
@@ -9,7 +7,7 @@ local Utils = require 'm0.utils'
 
 ---@class M0.OpenAI :M0.LLMAPI
 ---@field new fun(self:M0.LLMAPI, backend_opts:M0.BackendOptions, state: table):M0.LLMAPI
----@field get_messages fun(self:M0.OpenAI, messages:RawMessage[]):M0.OpenAIMessage[]
+---@field get_messages fun(self:M0.OpenAI, messages:string[]):M0.OpenAIMessage[]
 ---@field opts table
 ---@field state table
 

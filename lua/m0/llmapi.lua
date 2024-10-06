@@ -1,5 +1,3 @@
-require 'm0.message'
-
 ---@alias DeltaEventType
 ---| "cruft" # we received data we will not parse.
 ---| "delta" # we received a delta.
@@ -12,7 +10,7 @@ require 'm0.message'
 ---@field opts? M0.BackendOptions
 ---@field make_body? fun(self:M0.LLMAPI):table Make the API request body.
 ---@field make_headers? fun(self:M0.LLMAPI):table Make the API request headers.
----@field get_messages? fun(self:M0.LLMAPI, messages:RawMessage[]):RawMessage[] get the chat messages.
+---@field get_messages? fun(self:M0.LLMAPI, messages:string[]):string[] get the chat messages.
 ---@field get_response_text? fun(self:M0.LLMAPI, data:string):boolean,string?,string? Returns the text content of an API response.
 ---Returns delta_event,data
 ---where

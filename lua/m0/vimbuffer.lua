@@ -1,11 +1,9 @@
-require 'm0.message'
-
 ---@class M0.VimBuffer
 ---@field opts M0.Config | nil
 ---@field buf_id integer | nil
 ---@field new? fun(self:M0.VimBuffer, opts:table):M0.VimBuffer
 ---@field get_visual_selection? fun(self:M0.VimBuffer):string[]
----@field get_messages? fun(self:M0.VimBuffer):RawMessage[]
+---@field get_messages? fun(self:M0.VimBuffer):string[]
 ---@field open_response? fun(self:M0.VimBuffer)
 ---@field close_response? fun(self:M0.VimBuffer)
 ---@field put_response? fun(self:M0.VimBuffer, response:string, opts?:table):boolean
@@ -54,10 +52,9 @@ function M:get_visual_selection()
 end
 
 --- Get messages from current buffer, generating a list of 'messages'.
----@return RawMessage[]
+---@return string[]
 function M:get_messages()
   self.buf_id = vim.api.nvim_get_current_buf()
-  ---@type RawMessage[]
   local messages = {}
   local section_mark = self.opts.section_mark
   local conversation = nil

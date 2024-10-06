@@ -94,14 +94,13 @@ local function make_backend(API, msg_buf, opts, state)
 
           local event, d = API:get_delta_text(out)
           if event == 'delta' then
-            -- Append the delta to the current line.
-            msg_buf:set_last_line(msg_buf:get_last_line() .. d)
+            msg_buf:put_response(d, { stream = true })
           elseif event == 'error' then
             M.Logger:log_error(d)
           elseif event == 'stats' then
             M.Logger:log_info(d)
           elseif event == 'done' then
-            msg_buf:close_section()
+            msg_buf:close_response()
           elseif d then
             M.Logger:log_trace('Unhandled stream results: ' .. d)
           end
@@ -110,7 +109,6 @@ local function make_backend(API, msg_buf, opts, state)
         -- Not streaming.
         -- We append the LLM's reply to the current buffer at one go.
         curl_opts.callback = vim.schedule_wrap(function(out)
-          M.Logger:log_trace(vim.inspect(out))
           if out and out.status and (out.status < 200 or out.status > 299) then
             M.Logger:log_error('Error in response: ' .. vim.inspect(out))
             return
@@ -122,22 +120,19 @@ local function make_backend(API, msg_buf, opts, state)
             return
           end
           if response then
-            msg_buf:set_last_line(response)
+            msg_buf:put_response(response)
           end
           if stats then
             M.Logger:log_info(stats)
           end
-          msg_buf:close_section()
+          msg_buf:close_response()
         end)
       end
 
-      -- The closing section mark is printed by the curl callbacks.
-      msg_buf:open_section()
+      msg_buf:open_response()
       local response = require('plenary.curl').post(opts.url, curl_opts)
       if not response then
         M.Logger:log_error 'Failed to obtain CuRL response.'
-      else
-        M.Logger:log_trace('CuRL response: ' .. vim.inspect(response))
       end
     end,
   }

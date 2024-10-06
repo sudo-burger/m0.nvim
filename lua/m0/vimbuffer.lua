@@ -9,8 +9,9 @@ require 'm0.message'
 ---@field append_lines? fun(self:M0.VimBuffer, lines:string[])
 ---@field get_last_line? fun(self:M0.VimBuffer):string
 ---@field set_last_line? fun(self:M0.VimBuffer, txt:string)
----@field open_section? fun(self:M0.VimBuffer)
----@field close_section? fun(self:M0.VimBuffer)
+---@field open_response? fun(self:M0.VimBuffer)
+---@field close_response? fun(self:M0.VimBuffer)
+---@field put_response fun(self:M0.VimBuffer, response:string, opts?:table):boolean
 
 ---@type M0.VimBuffer
 local M = {
@@ -25,6 +26,17 @@ function M:new(opts)
     { buf_id = vim.api.nvim_get_current_buf(), opts = opts },
     { __index = M }
   )
+end
+
+function M:put_response(response, opts)
+  if not opts or opts.stream == false then
+    self:set_last_line(response)
+  else
+    -- Assume streaming.
+    -- Append the delta to the current line.
+    self:set_last_line(self:get_last_line() .. response)
+  end
+  return true
 end
 
 ---Get the currently selected text.
@@ -102,13 +114,13 @@ function M:set_last_line(txt)
   )
 end
 
---- Open/close a chat sections.
+--- Open/close a response.
 --- FIX: the same marker opens/closes sections at the moment.
 --- We may want different markers.
-function M:open_section()
+function M:open_response()
   self:append_lines { self.opts.section_mark, '' }
 end
-function M:close_section()
+function M:close_response()
   self:append_lines { self.opts.section_mark, '' }
 end
 

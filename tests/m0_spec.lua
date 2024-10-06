@@ -2,7 +2,7 @@ local M0 = require 'm0'
 local assert = require 'luassert'
 local stub = require 'luassert.stub'
 
-local function make_dummpy_api_key()
+local function make_dummy_api_key()
   return 'dummy_key'
 end
 
@@ -10,10 +10,10 @@ describe('m0.nvim', function()
   local mock_config = {
     providers = {
       ['openai'] = {
-        api_key = make_dummpy_api_key,
+        api_key = make_dummy_api_key,
       },
       ['anthropic'] = {
-        api_key = make_dummpy_api_key,
+        api_key = make_dummy_api_key,
       },
     },
     backends = {

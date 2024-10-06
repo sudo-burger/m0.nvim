@@ -322,15 +322,15 @@ function M.setup(user_config)
     -- Whether to scan the project for added context or not.
     scan_project = {
       impl = function(_, _)
-        local current = ''
-        if M.State.scan_project == true then
-          current = 'on'
-        else
-          current = 'off'
-        end
+        -- local current = ''
+        -- if M.State.scan_project == true then
+        --   current = 'on'
+        -- else
+        --   current = 'off'
+        -- end
         vim.ui.select(
           { 'on', 'off' },
-          { prompt = 'Current: ' .. current },
+          { prompt = 'Current: ' .. (M.State.scan_project and 'on' or 'off') },
           function(choice)
             if choice == 'on' then
               M.State.scan_project = true

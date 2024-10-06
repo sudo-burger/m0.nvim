@@ -65,16 +65,11 @@ local make_selector = function(opts, title, results, callback)
 end
 
 --- A single-item selector.
---- @param opts table Telescope theme.
+--- @param items table Items to select.
 --- @param callback fun(opts: table):nil A callback to be called on selection.
 --- @return fun():nil
-function M:make_selector(opts, callback)
-  return make_selector(
-    {}, -- require('telescope.themes').get_dropdown {},
-    nil,
-    opts,
-    callback
-  )
+function M:make_selector(items, callback)
+  return make_selector({}, nil, items, callback)
 end
 
 return M

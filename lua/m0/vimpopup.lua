@@ -9,10 +9,13 @@ function M:popup(txt)
 
   -- Sanity checks.
   if win_width < 20 or win_height < 20 then
-    return false, 'We are in a tight place.'
+    return nil, 'We are in a tight place.'
   end
 
-  local popup_buf_id = vim.api.nvim_create_buf(false, true)
+  local buf_id = vim.api.nvim_create_buf(false, true)
+  if buf_id == 0 then
+    return nil, 'Unable to create popup buffer.'
+  end
   vim.api.nvim_buf_set_lines(
     popup_buf_id,
     -2,
@@ -32,8 +35,8 @@ function M:popup(txt)
     border = 'rounded',
   })
   if win_id == 0 then
-    vim.api.nvim_buf_delete(popup_buf_id, {})
-    return false, 'Unable to create popup window.'
+    vim.api.nvim_buf_delete(buf_id, {})
+    return nil, 'Unable to create popup window.'
   end
   --
   -- Bind q to quit popup.
@@ -42,6 +45,7 @@ function M:popup(txt)
     vim.api.nvim_buf_delete(popup_buf_id, {})
   end, { buffer = popup_buf_id })
   return true
+  return buf_id
 end
 
 return M

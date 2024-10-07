@@ -326,7 +326,7 @@ function M.setup(user_config)
           -- split them as required by nvim_buf_get_lines()
           vim.fn.split(M:debug(), '\n', false)
         )
-        vim.api.nvim_open_win(buf_id, true, {
+        local win_id = vim.api.nvim_open_win(buf_id, true, {
           relative = 'win',
           row = 5,
           col = 5,
@@ -335,6 +335,13 @@ function M.setup(user_config)
           style = 'minimal',
           border = 'rounded',
         })
+        if win_id == 0 then
+          M.Logger:log_error 'Unable to create popup window.'
+        end
+        -- Bind q to quit popup.
+        vim.keymap.set('n', 'q', function()
+          vim.api.nvim_win_close(win_id, true)
+        end, { buffer = buf_id })
       end,
     },
     -- What prompt to use.

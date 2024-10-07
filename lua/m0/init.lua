@@ -310,8 +310,8 @@ function M.setup(user_config)
     },
     info = {
       impl = function(_, _)
-        local success, err = require('m0.vimpopup'):popup(M:debug())
-        if not success then
+        local buf_id, err = require('m0.vimpopup'):popup(M:debug())
+        if not buf_id then
           M.Logger:log_error(err or '')
         end
       end,

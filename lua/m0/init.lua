@@ -310,38 +310,10 @@ function M.setup(user_config)
     },
     info = {
       impl = function(_, _)
-        local win_width = vim.api.nvim_win_get_width(0)
-        local win_height = vim.api.nvim_win_get_height(0)
-        if win_width < 20 or win_height < 20 then
-          M.Logger:log_warn 'We are in a tight place.'
-          return
+        local success, err = require('m0.vimpopup'):popup(M:debug())
+        if not success then
+          M.Logger:log_error(err or '')
         end
-        local buf_id = vim.api.nvim_create_buf(false, true)
-        vim.api.nvim_buf_set_lines(
-          buf_id,
-          -2,
-          -1,
-          false,
-          -- If the input contains multiple lines,
-          -- split them as required by nvim_buf_get_lines()
-          vim.fn.split(M:debug(), '\n', false)
-        )
-        local win_id = vim.api.nvim_open_win(buf_id, true, {
-          relative = 'win',
-          row = 5,
-          col = 5,
-          width = win_width - 10,
-          height = win_height - 10,
-          style = 'minimal',
-          border = 'rounded',
-        })
-        if win_id == 0 then
-          M.Logger:log_error 'Unable to create popup window.'
-        end
-        -- Bind q to quit popup.
-        vim.keymap.set('n', 'q', function()
-          vim.api.nvim_win_close(win_id, true)
-        end, { buffer = buf_id })
       end,
     },
     -- What prompt to use.

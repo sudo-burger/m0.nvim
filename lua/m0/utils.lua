@@ -6,11 +6,19 @@
 ---@diagnostic disable-next-line: missing-fields
 local M = {}
 
-function M:safe_call(func, ...)
-  return pcall(func, ...)
+--- Execute a function safely, catching any errors that may occur.
+--- @param fun fun(...) The function to execute.
+--- @param ... ... Any additional arguments to pass to the function.
+--- @return boolean success
+--- @return any result
+--- @return ...
+function M:safe_call(fun, ...)
+  return pcall(fun, ...)
 end
 
---- Safe json_decode.
+--- Decode a JSON string safely.
+--- @param data string The JSON string to decode.
+--- @return table The decoded object, or nil and an error message if decoding fails.
 function M:json_decode(data)
   return self:safe_call(vim.fn.json_decode, data)
 end

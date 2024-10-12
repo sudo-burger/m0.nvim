@@ -1,5 +1,5 @@
 ---@class M0.Utils
----@field safe_call fun(self:M0.Utils, func: fun(), ...):any
+---@field safe_call fun(self:M0.Utils, func: fun(), ...):any,string?
 ---@field json_decode fun(self:M0.Utils, data: any):any
 
 ---@type M0.Utils
@@ -9,11 +9,14 @@ local M = {}
 --- Execute a function safely, catching any errors that may occur.
 --- @param fun fun(...) The function to execute.
 --- @param ... ... Any additional arguments to pass to the function.
---- @return boolean success
 --- @return any result
---- @return ...
+--- @return string? result
 function M:safe_call(fun, ...)
-  return pcall(fun, ...)
+  local success, ret = pcall(fun, ...)
+  if not success then
+    return nil, ret
+  end
+  return ret
 end
 
 --- Decode a JSON string safely.

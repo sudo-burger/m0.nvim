@@ -77,11 +77,10 @@ function M:get_messages(raw_messages)
 end
 
 function M:get_response_text(data)
-  local success, json = Utils:json_decode(data)
+  local json, msg = Utils:json_decode(data)
   if
     not (
-      success
-      and json
+      json
       and json.choices
       and json.choices[1]
       and json.choices[1].message
@@ -90,7 +89,7 @@ function M:get_response_text(data)
       and json.usage
     )
   then
-    return false, 'Unable to decode: ' .. data, nil
+    return false, 'Unable to decode (' .. msg .. '): ' .. data, nil
   end
   return true, json.choices[1].message.content, vim.inspect(json.usage)
 end
@@ -101,9 +100,9 @@ function M:get_delta_text(body)
     return 'done', body
   end
   if body and string.find(body, '^data: ') then
-    local success, json = Utils:json_decode(string.sub(body, 7))
-    if not success and json then
-      return 'error', 'Unable to decode: ' .. body
+    local json, msg = Utils:json_decode(string.sub(body, 7))
+    if not json then
+      return 'error', 'Unable to decode (' .. msg .. '): ' .. body
     end
 
     -- Handle the actual delta.

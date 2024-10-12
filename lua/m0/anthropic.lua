@@ -116,9 +116,9 @@ function M:get_messages(raw_messages)
 end
 
 function M:get_response_text(data)
-  local success, json = Utils:json_decode(data)
-  if not success then
-    return false, 'Unable to decode: ' .. data, nil
+  local json, msg = Utils:json_decode(data)
+  if not json then
+    return false, 'Unable to decode (' .. msg .. '): ' .. data, nil
   end
   if not (json.content and json.content[1] and json.content[1].text) then
     return false, 'Unable to get response: ' .. data, nil
@@ -131,9 +131,9 @@ end
 -- What is the SDK standard, if any?
 function M:get_delta_text(body)
   if body and string.find(body, '^data: ') then
-    local success, json = Utils:json_decode(string.sub(body, 7))
-    if not (success and json and json.type) then
-      return 'error', 'Unable to decode: ' .. body
+    local json, msg = Utils:json_decode(string.sub(body, 7))
+    if not (json and json.type) then
+      return 'error', 'Unable to decode (' .. msg .. '): ' .. body
     end
 
     if

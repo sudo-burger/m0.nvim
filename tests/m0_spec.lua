@@ -141,7 +141,7 @@ describe('m0.nvim', function()
     end)
 
     it('should initiate a chat', function()
-      M0:M0chat()
+      M0:chat()
       assert.stub(mock_api.make_body).was_called()
       assert.stub(mock_api.make_headers).was_called()
     end)
@@ -163,13 +163,13 @@ describe('m0.nvim', function()
 
     it('should scan project when enabled', function()
       M0.State.scan_project = true
-      M0:M0chat()
+      M0:chat()
       assert.stub(require('m0.scanproject').get_context).was_called()
     end)
 
     it('should not scan project when disabled', function()
       M0.State.scan_project = false
-      M0:M0chat()
+      M0:chat()
       assert.stub(require('m0.scanproject').get_context).was_not_called()
     end)
   end)
@@ -198,7 +198,7 @@ describe('m0.nvim', function()
       }
       stub(require 'm0.apifactory', 'create').returns(error_api)
 
-      M0:M0chat()
+      M0:chat()
       assert.stub(require('m0.utils').log_error).was_called()
 
       require('m0.utils').log_error:revert()

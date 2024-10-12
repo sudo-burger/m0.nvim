@@ -208,9 +208,8 @@ function M:M0prompt(prompt_name)
   self.State.prompt = self.Config.prompts[prompt_name]
 end
 
---- Run a chat round.
 ---@return nil
-function M:M0chat()
+function M:chat()
   M.State.backend.run()
 end
 
@@ -257,7 +256,7 @@ function M.setup(user_config)
   vim.keymap.set(
     { 'n', 'v' },
     '<Plug>(M0 chat)',
-    M.M0chat,
+    M.chat,
     { noremap = true, silent = true }
   )
   vim.keymap.set(
@@ -306,7 +305,7 @@ function M.setup(user_config)
       end,
     },
     chat = {
-      impl = M.M0chat,
+      impl = M.chat,
     },
     info = {
       impl = function(_, _)

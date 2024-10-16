@@ -1,12 +1,12 @@
 ---@class M0.Logger
 ---@field new fun(self:M0.Logger, opts:table):M0.Logger
 ---@field opts table
----@field _logger fun(self:M0.Logger, level:integer):fun(message:string):nil
----@field log_trace fun(self:M0.Logger, message: string):nil
----@field log_debug fun(self:M0.Logger, message: string):nil
----@field log_info fun(self:M0.Logger, message: string):nil
----@field log_warn fun(self:M0.Logger, message: string):nil
----@field log_error fun(self:M0.Logger, message: string):nil
+---@field _logger fun(self:M0.Logger, level:integer):fun(message:string?):nil
+---@field log_trace fun(self:M0.Logger, message: string?):nil
+---@field log_debug fun(self:M0.Logger, message: string?):nil
+---@field log_info fun(self:M0.Logger, message: string?):nil
+---@field log_warn fun(self:M0.Logger, message: string?):nil
+---@field log_error fun(self:M0.Logger, message: string?):nil
 
 ---@type M0.Logger
 ---@diagnostic disable-next-line: missing-fields
@@ -23,7 +23,7 @@ function M:_logger(level)
     if self.opts.log_level > level then
       return
     end
-    vim.notify(message, level)
+    vim.notify(message or '', level)
   end
 end
 

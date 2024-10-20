@@ -75,7 +75,6 @@ local function make_backend(API, msg_buf, opts, state)
   return {
     opts = opts,
 
-    -- FIXME: Do we need a rewrite() function, separate from run()?
     -- FIXME: Do we pass (a configurable number of) extra rows before/after as context?
     rewrite = function()
       local success, err

@@ -11,10 +11,10 @@ local function read_file(path)
     return false, err
   end
   local contents, err = file:read '*all'
+  file:close()
   if not contents then
     return false, err
   end
-  file:close()
   return true, contents
 end
 

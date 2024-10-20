@@ -110,7 +110,9 @@ learning.]]
 
   local project = '<project>\n'
   local files = require('plenary.scandir').scan_dir(dir)
-  for _, f in pairs(files) do
+  -- Ensure that the files are read in a consistent order to improve caching.
+  table.sort(files)
+  for _, f in ipairs(files) do
     local success, contents = read_file(f)
     if not success then
       return false, contents

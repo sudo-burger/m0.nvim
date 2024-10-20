@@ -127,6 +127,14 @@ local M = {
 
 function M:validate()
   local errors = {}
+  -- Must have a valid log level.
+  if
+    self.log_level < vim.log.levels.TRACE
+    or self.log_level > vim.log.levels.OFF
+  then
+    table.insert(errors, 'Invalid log level.')
+  end
+
   -- Must have a default backend name.
   if not self.default_backend_name then
     table.insert(errors, 'No default backend configured.')
@@ -146,6 +154,7 @@ function M:validate()
         .. ')'
     )
   end
+
   -- Must have a default prompt name.
   if not self.default_prompt_name then
     table.insert(errors, 'No default backend configured.')

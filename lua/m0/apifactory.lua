@@ -12,7 +12,8 @@ local APIHandlers = {
 ---@param api_type api_type
 ---@param opts M0.BackendOptions
 ---@param state table reference to current state.
----@return boolean, M0.LLMAPI?
+---@return boolean success
+---@return M0.LLMAPI|string ret If the function fails, this is an error string.
 function M.create(api_type, opts, state)
   local APIHandler = APIHandlers[api_type]
   if not APIHandler then

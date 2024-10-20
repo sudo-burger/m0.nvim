@@ -1,4 +1,4 @@
----@class M0.APIFactory
+---@class M0.LLMAPIFactory
 local M = {}
 
 local Anthropic = require 'm0.anthropic'

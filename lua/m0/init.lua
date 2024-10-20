@@ -1,8 +1,8 @@
 ---@type M0.Logger
 local Logger = require 'm0.logger'
 
----@type M0.APIFactory
-local APIFactory = require 'm0.apifactory'
+---@type M0.LLMAPIFactory
+local LLMAPIFactory = require 'm0.llmapifactory'
 
 ---@type M0.Selector
 local Selector = require 'm0.selector'
@@ -211,9 +211,9 @@ function M:M0backend(backend_name)
     { name = backend_name }
   )
 
-  ---@type boolean,M0.LLMAPI?
+  ---@type boolean,M0.LLMAPI|string
   local success, API =
-    APIFactory.create(backend_opts.api_type, backend_opts, M.State)
+    LLMAPIFactory.create(backend_opts.api_type, backend_opts, M.State)
   if not success then
     self.Logger:log_error(
       'Unable create API for ' .. backend_opts.api_type .. ': ' .. (API or '')

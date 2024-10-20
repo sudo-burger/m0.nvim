@@ -260,8 +260,8 @@ function M.setup(user_config)
   -- Merge user configuration, overriding defaults.
   M.Config = vim.tbl_extend('force', M.Config, user_config or {})
 
-  -- Init the backend logger
-  M.State.log_level = M.Config.log_level
+  -- Init the backend logger.
+  M.State.log_level = M.Config.log_level or vim.log.levels.WARN
   M.Logger = Logger:new {
     log_level = M.State.log_level,
   }

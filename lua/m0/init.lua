@@ -12,7 +12,8 @@ local Utils = require 'm0.utils'
 
 ---@class Backend
 ---@field opts M0.BackendOptions
----@field run fun(): nil
+---@field chat fun(): nil
+---@field rewrite fun(): nil
 
 ---@class State
 ---@field log_level integer?
@@ -33,39 +34,71 @@ M.__index = M
 ---@type M0.VimBuffer
 local VimBuffer = require 'm0.vimbuffer'
 
----Returns a table including the backend-specific implementation of the function run().
----
 ---@param API M0.LLMAPI The API handler.
 ---@param msg_buf M0.VimBuffer
 ---@param opts M0.BackendOptions
 ---@param state State
 ---@return Backend
 local function make_backend(API, msg_buf, opts, state)
+  local function make_body()
+    local body = API:make_body()
+    local messages = msg_buf:get_messages()
+    body.messages = API:get_messages(messages)
+    return body
+  end
+
+  local function make_curl_opts(body)
+    return {
+      headers = API:make_headers(),
+      body = vim.fn.json_encode(body),
+    }
+  end
+
+  ---@return boolean success
+  ---@return string? err
+  local function scan_project()
+    if state.scan_project ~= true then
+      return true
+    end
+    -- If a scan of the project has been requested,
+    -- re-scan on every turn, to catch code changes.
+    -- FIXME: don't assume that cwd is project's root.
+    local success, context =
+      require('m0.scanproject'):get_context(vim.fn.getcwd())
+    if not success then
+      return false, 'Unable to scan project: ' .. context
+    end
+    state.project_context = context
+    return true
+  end
+
   return {
     opts = opts,
-    -- name = opts.backend_name,
-    run = function()
-      if state.scan_project == true then
-        -- If a scan of the project has been requested, it should make sense
-        -- to re-scan on every turn, to catch code changes.
-        -- FIXME: don't assume that cwd is project's root.
-        local success, context =
-          require('m0.scanproject'):get_context(vim.fn.getcwd())
-        if not success then
-          M.Logger:log_error(context)
-        else
-          state.project_context = context
-        end
+
+    -- FIXME: Do we need a rewrite() function, separate from run()?
+    -- FIXME: Do we pass (a configurable number of) extra rows before/after as context?
+    rewrite = function()
+      local success, err
+      success, err = scan_project()
+      if not success then
+        M.Logger:log_error(err)
       end
 
-      local body = API:make_body()
-      local messages = msg_buf:get_messages()
-      body.messages = API:get_messages(messages)
+      local body = make_body()
+      local curl_opts = make_curl_opts(body)
 
-      local curl_opts = {
-        headers = API:make_headers(),
-        body = vim.fn.json_encode(body),
-      }
+      -- Popup if asked for further instructions.
+      msg_buf:put_response('FIXME:', { rewrite = true })
+    end,
+
+    chat = function()
+      local success, err
+      success, err = scan_project()
+      if not success then
+        M.Logger:log_error(err)
+      end
+      local body = make_body()
+      local curl_opts = make_curl_opts(body)
 
       -- Different callbacks needed, depending on whether streaming is enabled or not.
       if opts.stream == true then
@@ -138,9 +171,6 @@ local function make_backend(API, msg_buf, opts, state)
   }
 end
 
--- Exported functions
--- ------------------
-
 ---Select backend interactively.
 ---@param backend_name string The name of the backend, as found in the user configuration.
 ---@return nil
@@ -168,6 +198,7 @@ function M:M0backend(backend_name)
         .. backend_name
         .. "'."
     )
+    return
   end
 
   -- Merge the defaults, provider opts, and backend opts.
@@ -210,7 +241,7 @@ end
 
 ---@return nil
 function M:chat()
-  M.State.backend.run()
+  M.State.backend.chat()
 end
 
 ---Returns printable debug information.

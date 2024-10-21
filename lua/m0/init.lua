@@ -86,8 +86,31 @@ local function make_backend(API, msg_buf, opts, state)
       local body = make_body()
       local curl_opts = make_curl_opts(body)
 
-      -- Popup if asked for further instructions.
-      msg_buf:put_response('FIXME:', { rewrite = true })
+      -- Not streaming.
+      -- We append the LLM's reply to the current buffer at one go.
+      curl_opts.callback = vim.schedule_wrap(function(out)
+        if out and out.status and (out.status < 200 or out.status > 299) then
+          M.Logger:log_error('Error in response: ' .. vim.inspect(out))
+          return
+        end
+
+        local success, response, stats = API:get_response_text(out.body)
+        if not success then
+          M.Logger:log_error('Failed to parse response: ' .. vim.inspect(out))
+          return
+        end
+        if response then
+          msg_buf:rewrite(response)
+        end
+        if stats then
+          M.Logger:log_info(stats)
+        end
+      end)
+
+      local response = require('plenary.curl').post(opts.url, curl_opts)
+      if not response then
+        M.Logger:log_error 'Failed to obtain CuRL response.'
+      end
     end,
 
     chat = function()
@@ -242,6 +265,9 @@ end
 function M:chat()
   M.State.backend.chat()
 end
+function M:rewrite()
+  M.State.backend.rewrite()
+end
 
 ---Returns printable debug information.
 ---@return string
@@ -293,6 +319,12 @@ function M.setup(user_config)
     { 'n' },
     '<Plug>(M0 prompt)',
     ':M0 prompt<CR>',
+    { noremap = true, silent = true }
+  )
+  vim.keymap.set(
+    { 'v' },
+    '<Plug>(M0 rewrite)',
+    M.rewrite,
     { noremap = true, silent = true }
   )
   vim.keymap.set(
@@ -362,6 +394,9 @@ function M.setup(user_config)
         end)()
       end,
     },
+    rewrite = {
+      impl = M.rewrite,
+    },
     -- Whether to scan the project for added context or not.
     scan_project = {
       impl = function(_, _)
@@ -389,6 +424,7 @@ function M.setup(user_config)
     local args = #fargs > 1 and vim.list_slice(fargs, 2, #fargs) or {}
     local subcommand = subcommand_tbl[subcommand_key]
     if not subcommand then
+      -- FIXME: logger
       vim.notify(
         'M0: unknown command: ' .. subcommand_key,
         vim.log.levels.ERROR

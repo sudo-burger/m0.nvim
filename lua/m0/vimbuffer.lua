@@ -1,21 +1,21 @@
 ---@class M0.VimBuffer
 ---@field opts M0.Config | nil
----@field buf_id integer | nil
+---@field buf_id integer
 ---@field new? fun(self:M0.VimBuffer, opts:table):M0.VimBuffer
----@field get_visual_selection? fun(self:M0.VimBuffer):string[]
+---@field get_visual_selection_lines? fun(self:M0.VimBuffer):string[]
 ---@field get_messages? fun(self:M0.VimBuffer):string[]
 ---@field open_response? fun(self:M0.VimBuffer)
 ---@field close_response? fun(self:M0.VimBuffer)
+---@field rewrite? fun(self:M0.VimBuffer, response:string, opts?:table):boolean,string?
 ---@field put_response? fun(self:M0.VimBuffer, response:string, opts?:table):boolean
 ---@field insert_lines? fun(self:M0.VimBuffer, lines:string[], opts?:table)
 ---@field get_last_line? fun(self:M0.VimBuffer):string
 ---@field set_last_line? fun(self:M0.VimBuffer, txt:string)
 
-
 ---@type M0.VimBuffer
 local M = {
   opts = nil,
-  buf_id = nil,
+  buf_id = 0,
 }
 
 ---@param opts M0.Config The current configuration
@@ -29,10 +29,10 @@ end
 
 function M:put_response(response, opts)
   if not opts or opts.stream == false then
+    -- Not streaming, so getting whole lines.
     self:set_last_line(response)
   else
-    -- Assume streaming.
-    -- Append the delta to the current line.
+    -- Streaming, so getting partial lines.
     self:set_last_line(self:get_last_line() .. response)
   end
   return true
@@ -40,7 +40,7 @@ end
 
 ---Get the currently selected text.
 ---@return string[]
-function M:get_visual_selection()
+function M:get_visual_selection_lines()
   local sline = vim.fn.line 'v'
   local eline = vim.fn.line '.'
   return vim.api.nvim_buf_get_lines(
@@ -51,6 +51,46 @@ function M:get_visual_selection()
   )
 end
 
+--- Returns true if we are in visual mode, otherwise false.
+---@return boolean
+local function in_visual_mode()
+  local mode = vim.api.nvim_get_mode().mode
+  if mode == 'v' or mode == 'V' then
+    return true
+  end
+  return false
+end
+
+function M:rewrite(txt)
+  if not in_visual_mode() then
+    return false, 'Cannot rewrite without selection.'
+  end
+
+  -- Tentatively:
+  -- Overwrite selected text (with diff if requested).
+  -- FIXME: duplicated code in get_visual_selection_lines()
+  local sline = vim.fn.line 'v'
+  local eline = vim.fn.line '.'
+  local startline = math.min(sline, eline) - 1
+  local endline = math.max(sline, eline)
+
+  -- Delete line range.
+  vim.api.nvim_buf_set_lines(self.buf_id, startline, endline, false, {})
+
+  -- FIXME: add non-streaming case.
+  -- Streaming, so getting partial lines.
+  vim.api.nvim_buf_set_lines(
+    self.buf_id,
+    startline,
+    startline,
+    false,
+    -- If the input contains multiple lines,
+    -- split them as required by nvim_buf_get_lines()
+    vim.fn.split(txt, '\n', true)
+  )
+  return true
+end
+
 --- Get messages from current buffer, generating a list of 'messages'.
 ---@return string[]
 function M:get_messages()
@@ -59,17 +99,15 @@ function M:get_messages()
   local section_mark = self.opts.section_mark
   local conversation = nil
 
-  local mode = vim.api.nvim_get_mode().mode
   -- If we are in visual mode, read the conversation from the visual selection.
   -- Otherwise use the whole current buffer as input.
-  if mode == 'v' or mode == 'V' then
-    conversation = self:get_visual_selection()
+  if in_visual_mode() then
+    conversation = self:get_visual_selection_lines()
   else
-    -- Read the conversation from the current buffer.
     conversation = vim.api.nvim_buf_get_lines(self.buf_id, 0, -1, false)
   end
 
-  -- Iterate through the conversation, transforming the raw text into
+  -- Iterate through the conversation lines, transforming the raw text into
   -- a list of messages.
   local i = 1
   while i <= #conversation do

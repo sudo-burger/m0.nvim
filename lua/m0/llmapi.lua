@@ -8,7 +8,7 @@
 ---Abstract class for LLM APIs.
 ---@class M0.LLMAPI
 ---@field opts M0.BackendOptions
----@field make_body fun(self:M0.LLMAPI):table Make the API request body.
+---@field make_body fun(self:M0.LLMAPI, messages:string[]):table Make the API request body.
 ---@field make_headers fun(self:M0.LLMAPI):table Make the API request headers.
 ---@field get_messages fun(self:M0.LLMAPI, messages:string[]):string[] Get the chat messages in API format.
 ---@field get_response_text fun(self:M0.LLMAPI, data:string):boolean,string?,string? Get the text content of an API response.

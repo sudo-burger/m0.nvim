@@ -21,7 +21,9 @@ function M:new(opts, state)
   )
 end
 
-function M:make_body()
+---@param messages string[]
+---@return table
+function M:make_body(messages)
   -- Handle model-specific defaults.
   local model_defaults = vim.tbl_filter(function(t)
     return t.name == self.opts.model.name
@@ -33,6 +35,7 @@ function M:make_body()
     stream = self.opts.stream,
     max_completion_tokens = self.opts.max_completion_tokens
       or model_defaults[1].max_completion_tokens,
+    messages = self:get_messages(messages),
   }
 
   if self.opts.stream and self.state.log_level <= vim.log.levels.DEBUG then

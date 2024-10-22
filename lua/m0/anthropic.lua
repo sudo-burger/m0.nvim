@@ -23,7 +23,7 @@ function M:new(opts, state)
   )
 end
 
-function M:make_body()
+function M:make_body(messages)
   local system
 
   -- The "prompt caching" feature replaces the body.system element with
@@ -56,6 +56,7 @@ function M:make_body()
     stream = self.opts.stream,
     max_tokens = self.opts.max_tokens or model_defaults[1].max_tokens,
     system = system,
+    messages = self:get_messages(messages),
   }
 end
 

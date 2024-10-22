@@ -10,6 +10,8 @@ local Selector = require 'm0.selector'
 ---@type M0.Utils
 local Utils = require 'm0.utils'
 
+---@alias backend_mode 'chat' | 'rewrite'
+
 ---@class Backend
 ---@field opts M0.BackendOptions
 ---@field chat fun(): nil
@@ -40,14 +42,9 @@ local VimBuffer = require 'm0.vimbuffer'
 ---@param state State
 ---@return Backend
 local function make_backend(API, msg_buf, opts, state)
-  local function make_body()
-    local body = API:make_body()
+  local function make_curl_opts()
     local messages = msg_buf:get_messages()
-    body.messages = API:get_messages(messages)
-    return body
-  end
-
-  local function make_curl_opts(body)
+    local body = API:make_body(messages)
     return {
       headers = API:make_headers(),
       body = vim.fn.json_encode(body),
@@ -72,6 +69,74 @@ local function make_backend(API, msg_buf, opts, state)
     return true
   end
 
+  ---@param mode backend_mode
+  local function curl_stream_callback(mode)
+    return vim.schedule_wrap(function(err, out, _job)
+      M.Logger:log_trace(
+        'Err: ' .. (err or '') .. '\nOut: ' .. (out or '')
+        -- .. '\nJob: '
+        -- .. (vim.inspect(_job) or '')
+      )
+      if err then
+        M.Logger:log_error('Stream error: [' .. err .. '] [' .. out .. ']')
+        return
+      end
+      -- When streaming, it seems the best chance to catch an API error
+      -- is to parse stdout.
+      if _job._stdout_results ~= {} then
+        local json, _ = Utils:json_decode(_job._stdout_results)
+        if json and json.error then
+          M.Logger:log_error('Stream error: [' .. vim.inspect(json) .. ']')
+          return
+        end
+      end
+
+      local event, d = API:get_delta_text(out)
+      if event == 'delta' then
+        if mode == 'chat' then
+          msg_buf:put_response(d, { stream = true })
+        elseif mode == 'rewrite' then
+          msg_buf:rewrite(d, { stream = true })
+        end
+      elseif event == 'error' then
+        M.Logger:log_error(d)
+      elseif event == 'stats' then
+        M.Logger:log_info(d)
+      elseif event == 'done' then
+        msg_buf:close_buffer(mode)
+      elseif d then
+        M.Logger:log_trace('Unhandled stream results: ' .. d)
+      end
+    end)
+  end
+
+  ---@param mode backend_mode
+  local function curl_callback(mode)
+    return vim.schedule_wrap(function(out)
+      if out and out.status and (out.status < 200 or out.status > 299) then
+        M.Logger:log_error('Error in response: ' .. vim.inspect(out))
+        return
+      end
+
+      local success, response, stats = API:get_response_text(out.body)
+      if not success then
+        M.Logger:log_error('Failed to parse response: ' .. vim.inspect(out))
+        return
+      end
+      if response then
+        if mode == 'chat' then
+          msg_buf:put_response(response)
+        elseif mode == 'rewrite' then
+          msg_buf:rewrite(response)
+        end
+        msg_buf:close_buffer(mode)
+      end
+      if stats then
+        M.Logger:log_info(stats)
+      end
+    end)
+  end
+
   return {
     opts = opts,
 
@@ -83,30 +148,15 @@ local function make_backend(API, msg_buf, opts, state)
         M.Logger:log_error(err)
       end
 
-      local body = make_body()
-      local curl_opts = make_curl_opts(body)
+      local curl_opts = make_curl_opts()
 
-      -- Not streaming.
-      -- We append the LLM's reply to the current buffer at one go.
-      curl_opts.callback = vim.schedule_wrap(function(out)
-        if out and out.status and (out.status < 200 or out.status > 299) then
-          M.Logger:log_error('Error in response: ' .. vim.inspect(out))
-          return
-        end
+      if opts.stream == true then
+        curl_opts.stream = curl_stream_callback 'rewrite'
+      else
+        curl_opts.callback = curl_callback 'rewrite'
+      end
 
-        local success, response, stats = API:get_response_text(out.body)
-        if not success then
-          M.Logger:log_error('Failed to parse response: ' .. vim.inspect(out))
-          return
-        end
-        if response then
-          msg_buf:rewrite(response)
-        end
-        if stats then
-          M.Logger:log_info(stats)
-        end
-      end)
-
+      msg_buf:open_buffer 'rewrite'
       local response = require('plenary.curl').post(opts.url, curl_opts)
       if not response then
         M.Logger:log_error 'Failed to obtain CuRL response.'
@@ -119,72 +169,19 @@ local function make_backend(API, msg_buf, opts, state)
       if not success then
         M.Logger:log_error(err)
       end
-      local body = make_body()
-      local curl_opts = make_curl_opts(body)
+
+      local curl_opts = make_curl_opts()
 
       -- Different callbacks needed, depending on whether streaming is enabled or not.
       if opts.stream == true then
-        curl_opts.stream = vim.schedule_wrap(function(err, out, _job)
-          M.Logger:log_trace(
-            'Err: '
-              .. (err or '')
-              .. '\nOut: '
-              .. (out or '')
-              .. '\nJob: '
-              .. vim.inspect(_job)
-          )
-          if err then
-            M.Logger:log_error('Stream error: [' .. err .. '] [' .. out .. ']')
-            return
-          end
-          -- When streaming, it seems the best chance to catch an API error
-          -- is to parse stdout.
-          if _job._stdout_results ~= {} then
-            local json, _ = Utils:json_decode(_job._stdout_results)
-            if json and json.error then
-              M.Logger:log_error('Stream error: [' .. vim.inspect(json) .. ']')
-              return
-            end
-          end
-
-          local event, d = API:get_delta_text(out)
-          if event == 'delta' then
-            msg_buf:put_response(d, { stream = true })
-          elseif event == 'error' then
-            M.Logger:log_error(d)
-          elseif event == 'stats' then
-            M.Logger:log_info(d)
-          elseif event == 'done' then
-            msg_buf:close_response()
-          elseif d then
-            M.Logger:log_trace('Unhandled stream results: ' .. d)
-          end
-        end)
+        curl_opts.stream = curl_stream_callback 'chat'
       else
         -- Not streaming.
         -- We append the LLM's reply to the current buffer at one go.
-        curl_opts.callback = vim.schedule_wrap(function(out)
-          if out and out.status and (out.status < 200 or out.status > 299) then
-            M.Logger:log_error('Error in response: ' .. vim.inspect(out))
-            return
-          end
-
-          local success, response, stats = API:get_response_text(out.body)
-          if not success then
-            M.Logger:log_error('Failed to parse response: ' .. vim.inspect(out))
-            return
-          end
-          if response then
-            msg_buf:put_response(response)
-          end
-          if stats then
-            M.Logger:log_info(stats)
-          end
-          msg_buf:close_response()
-        end)
+        curl_opts.callback = curl_callback 'chat'
       end
 
-      msg_buf:open_response()
+      msg_buf:open_buffer 'chat'
       local response = require('plenary.curl').post(opts.url, curl_opts)
       if not response then
         M.Logger:log_error 'Failed to obtain CuRL response.'

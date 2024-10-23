@@ -72,9 +72,10 @@ local M = {
         stream = true,
         temperature = 0.7,
         models = {
-          { name = 'claude-3-5-sonnet-20240620', max_tokens = 8192 },
+          { name = 'claude-3-5-sonnet-latest', max_tokens = 8192 },
+          { name = 'claude-3-5-haiku-latest', max_tokens = 8192 },
           { name = 'claude-3-haiku-20240307', max_tokens = 4096 },
-          { name = 'claude-3-opus-20240229', max_tokens = 4096 },
+          { name = 'claude-3-opus-latest', max_tokens = 4096 },
           { name = 'claude-3-sonnet-20240229', max_tokens = 4096 },
         },
       },

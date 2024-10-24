@@ -182,6 +182,8 @@ function M:close_buffer(mode)
       self.win_id,
       { vim.api.nvim_buf_line_count(self.buf_id), 0 }
     )
+  elseif mode == 'rewrite' and in_visual_mode() then
+    -- FIXME: wrap the visual selection, as if using 'gq'.
   end
 end
 

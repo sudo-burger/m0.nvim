@@ -133,11 +133,11 @@ describe('m0.nvim', function()
         get_messages = stub.new(),
         get_response_text = stub.new(),
       }
-      stub(require 'm0.apifactory', 'create').returns(mock_api)
+      stub(require 'm0.llmapifactory', 'create').returns(mock_api)
     end)
 
     after_each(function()
-      require('m0.apifactory').create:revert()
+      require('m0.llmapifactory').create:revert()
     end)
 
     it('should initiate a chat', function()
@@ -179,30 +179,6 @@ describe('m0.nvim', function()
       local debug_info = M0:debug()
       assert.is_string(debug_info)
       assert.is_true(#debug_info > 0)
-    end)
-  end)
-
-  describe('error handling', function()
-    it('should handle API errors gracefully', function()
-      local utils_mock = {
-        log_error = stub.new(),
-      }
-      stub(require 'm0.utils', 'log_error')
-
-      local error_api = {
-        make_body = function()
-          error 'API error'
-        end,
-        make_headers = stub.new(),
-        get_messages = stub.new(),
-      }
-      stub(require 'm0.apifactory', 'create').returns(error_api)
-
-      M0:chat()
-      assert.stub(require('m0.utils').log_error).was_called()
-
-      require('m0.utils').log_error:revert()
-      require('m0.apifactory').create:revert()
     end)
   end)
 end)

@@ -32,6 +32,7 @@ function M:new(opts)
   }, { __index = M })
 end
 
+-- FIXME: we could probably remove some code and merge put_response() and rewrite(). They become similar if using self.cursor.
 function M:put_response(response, opts)
   -- This method assumes that 'open_buffer()' has appended an empty line
   -- to the end of the buffer.
@@ -71,6 +72,7 @@ local function in_visual_mode()
 end
 
 function M:rewrite(txt)
+  -- Assumes that self.cursor has been set in open_buffer().
   -- Streaming, so getting partial lines.
   vim.api.nvim_buf_set_text(
     self.buf_id,
@@ -80,8 +82,9 @@ function M:rewrite(txt)
     self.cursor[2],
     vim.fn.split(txt, '\n', true)
   )
+
+  -- Prepare for the next partial line, if any.
   self.cursor = vim.api.nvim_win_get_cursor(self.win_id)
-  -- vim.api.nvim_put(vim.fn.split(txt, '\n', true), 'c', true, true)
   return true
 end
 

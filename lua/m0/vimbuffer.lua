@@ -184,6 +184,19 @@ function M:close_buffer(mode)
     )
   elseif mode == 'rewrite' and in_visual_mode() then
     -- FIXME: wrap the visual selection, as if using 'gq'.
+    -- Get the line range that was originally selected
+    local startline, endline = get_visual_selection_line_span()
+
+    -- Format the text in the range using Vim's built-in formatting
+    vim.cmd(string.format('silent %d,%dnormal! gw', startline, endline))
+
+    -- -- Exit visual mode to return to normal mode
+    -- vim.cmd(
+    --   'normal! ' .. vim.api.nvim_replace_termcodes('<Esc>', true, false, true)
+    -- )
+    --
+    -- -- Position cursor at start of formatted text
+    -- vim.api.nvim_win_set_cursor(self.win_id, { startline + 1, 0 })
   end
 end
 

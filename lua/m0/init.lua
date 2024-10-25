@@ -399,11 +399,7 @@ function M.setup(user_config)
     local args = #fargs > 1 and vim.list_slice(fargs, 2, #fargs) or {}
     local subcommand = subcommand_tbl[subcommand_key]
     if not subcommand then
-      -- FIXME: logger
-      vim.notify(
-        'M0: unknown command: ' .. subcommand_key,
-        vim.log.levels.ERROR
-      )
+      M.Logger:log_error('M0: unknown command: ' .. subcommand_key)
       return
     end
     -- Invoke the subcommand.

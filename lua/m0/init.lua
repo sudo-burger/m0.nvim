@@ -137,56 +137,34 @@ local function make_backend(API, msg_buf, opts, state)
     end)
   end
 
+  local function make_action(mode)
+    return function()
+      local success, err
+      success, err = scan_project()
+      if not success then
+        M.Logger:log_error(err)
+      end
+
+      local curl_opts = make_curl_opts()
+
+      if opts.stream == true then
+        curl_opts.stream = curl_stream_callback(mode)
+      else
+        curl_opts.callback = curl_callback(mode)
+      end
+
+      msg_buf:open_buffer(mode)
+      local response = require('plenary.curl').post(opts.url, curl_opts)
+      if not response then
+        M.Logger:log_error 'Failed to obtain CuRL response.'
+      end
+    end
+  end
+
   return {
     opts = opts,
-
-    -- FIXME: Do we pass (a configurable number of) extra rows before/after as context?
-    rewrite = function()
-      local success, err
-      success, err = scan_project()
-      if not success then
-        M.Logger:log_error(err)
-      end
-
-      local curl_opts = make_curl_opts()
-
-      if opts.stream == true then
-        curl_opts.stream = curl_stream_callback 'rewrite'
-      else
-        curl_opts.callback = curl_callback 'rewrite'
-      end
-
-      msg_buf:open_buffer 'rewrite'
-      local response = require('plenary.curl').post(opts.url, curl_opts)
-      if not response then
-        M.Logger:log_error 'Failed to obtain CuRL response.'
-      end
-    end,
-
-    chat = function()
-      local success, err
-      success, err = scan_project()
-      if not success then
-        M.Logger:log_error(err)
-      end
-
-      local curl_opts = make_curl_opts()
-
-      -- Different callbacks needed, depending on whether streaming is enabled or not.
-      if opts.stream == true then
-        curl_opts.stream = curl_stream_callback 'chat'
-      else
-        -- Not streaming.
-        -- We append the LLM's reply to the current buffer at one go.
-        curl_opts.callback = curl_callback 'chat'
-      end
-
-      msg_buf:open_buffer 'chat'
-      local response = require('plenary.curl').post(opts.url, curl_opts)
-      if not response then
-        M.Logger:log_error 'Failed to obtain CuRL response.'
-      end
-    end,
+    rewrite = make_action 'rewrite',
+    chat = make_action 'chat',
   }
 end
 

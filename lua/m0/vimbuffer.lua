@@ -8,8 +8,7 @@
 ---@field get_messages? fun(self:M0.VimBuffer):string[]
 ---@field open_buffer? fun(self:M0.VimBuffer, mode:string)
 ---@field close_buffer? fun(self:M0.VimBuffer, mode:string)
----@field rewrite? fun(self:M0.VimBuffer, response:string, opts?:table):boolean,string?
----@field put_response? fun(self:M0.VimBuffer, response:string, opts?:table):boolean
+---@field put_response? fun(self:M0.VimBuffer, response:string, opts?:table):boolean,string?
 ---@field append_section_mark? fun(self:M0.VimBuffer)
 ---@field get_last_line? fun(self:M0.VimBuffer):string
 ---@field set_last_line? fun(self:M0.VimBuffer, txt:string)
@@ -32,33 +31,37 @@ function M:new(opts)
   }, { __index = M })
 end
 
--- FIXME: we could probably remove some code and merge put_response() and rewrite(). They become similar if using self.cursor.
-function M:put_response(response, opts)
-  -- This method assumes that 'open_buffer()' has appended an empty line
-  -- to the end of the buffer.
-  if not opts or opts.stream == false then
-    -- Not streaming, so the response consists of full lines.
-    self:set_last_line(response)
-  else
-    -- Streaming, so the response consists of partial lines.
-    self:set_last_line(self:get_last_line() .. response)
-  end
+function M:put_response(txt)
+  -- Assumes that self.cursor has been set in open_buffer() before the first
+  -- call.
+  vim.api.nvim_buf_set_text(
+    self.buf_id,
+    self.cursor[1] - 1,
+    self.cursor[2],
+    self.cursor[1] - 1,
+    self.cursor[2],
+    vim.fn.split(txt, '\n', true)
+  )
+
+  -- Prepare for the next write.
+  self.cursor = vim.api.nvim_win_get_cursor(self.win_id)
   return true
 end
 
+--- Returns 1-indexed values (the first line in the buffer is line 1).
 ---@return integer startline
 ---@return integer endline
 local function get_visual_selection_line_span()
   local sline = vim.fn.line 'v'
   local eline = vim.fn.line '.'
-  return math.min(sline, eline) - 1, math.max(sline, eline)
+  return math.min(sline, eline), math.max(sline, eline)
 end
 
 ---Get the currently selected text.
 ---@return string[]
 function M:get_visual_selection_lines()
   local startline, endline = get_visual_selection_line_span()
-  return vim.api.nvim_buf_get_lines(self.buf_id, startline, endline, false)
+  return vim.api.nvim_buf_get_lines(self.buf_id, startline - 1, endline, false)
 end
 
 --- Returns true if we are in visual mode, otherwise false.
@@ -69,23 +72,6 @@ local function in_visual_mode()
     return true
   end
   return false
-end
-
-function M:rewrite(txt)
-  -- Assumes that self.cursor has been set in open_buffer().
-  -- Streaming, so getting partial lines.
-  vim.api.nvim_buf_set_text(
-    self.buf_id,
-    self.cursor[1] - 1,
-    self.cursor[2],
-    self.cursor[1] - 1,
-    self.cursor[2],
-    vim.fn.split(txt, '\n', true)
-  )
-
-  -- Prepare for the next partial line, if any.
-  self.cursor = vim.api.nvim_win_get_cursor(self.win_id)
-  return true
 end
 
 ---Get messages from current buffer, generating a list of 'messages'.
@@ -150,7 +136,7 @@ function M:append_section_mark()
     -1,
     -1,
     false,
-    { self.opts.section_mark, '' }
+    { self.opts.section_mark, ' ' }
   )
 end
 
@@ -162,22 +148,33 @@ function M:open_buffer(mode)
 
   if mode == 'chat' then
     self:append_section_mark()
+    -- Move the cursor to the start of the last line, preparing for text to be
+    -- inserted.
+    self.cursor = { vim.api.nvim_buf_line_count(self.buf_id), 0 }
   elseif mode == 'rewrite' and in_visual_mode() then
     local startline, endline = get_visual_selection_line_span()
     -- Replace the selected line range with an empty line.
     -- This is the placeholder for the rewrite.
-    vim.api.nvim_buf_set_lines(self.buf_id, startline, endline, false, { '' })
-    -- Move the cursor to the empty line we just created, preparing for
-    -- text to be inserted.
-    self.cursor = { startline + 1, 0 }
-    vim.api.nvim_win_set_cursor(self.win_id, self.cursor)
+    vim.api.nvim_buf_set_lines(
+      self.buf_id,
+      startline - 1,
+      endline,
+      false,
+      { ' ' }
+    )
+    -- Move the cursor to the start of the empty line we just created, preparing
+    -- for text to be inserted.
+    self.cursor = { startline, 0 }
+  else
+    return
   end
+  vim.api.nvim_win_set_cursor(self.win_id, self.cursor)
 end
 
 function M:close_buffer(mode)
   if mode == 'chat' then
     self:append_section_mark()
-    -- Move cursor to end of document.
+    -- Move cursor to end of document, preparing for the next turn.
     vim.api.nvim_win_set_cursor(
       self.win_id,
       { vim.api.nvim_buf_line_count(self.buf_id), 0 }

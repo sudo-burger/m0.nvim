@@ -93,11 +93,7 @@ local function make_backend(API, msg_buf, opts, state)
 
       local event, d = API:get_delta_text(out)
       if event == 'delta' then
-        if mode == 'chat' then
-          msg_buf:put_response(d, { stream = true })
-        elseif mode == 'rewrite' then
-          msg_buf:rewrite(d, { stream = true })
-        end
+        msg_buf:put_response(d)
       elseif event == 'error' then
         M.Logger:log_error(d)
       elseif event == 'stats' then
@@ -124,11 +120,7 @@ local function make_backend(API, msg_buf, opts, state)
         return
       end
       if response then
-        if mode == 'chat' then
-          msg_buf:put_response(response)
-        elseif mode == 'rewrite' then
-          msg_buf:rewrite(response)
-        end
+        msg_buf:put_response(response)
         msg_buf:close_buffer(mode)
       end
       if stats then
@@ -153,6 +145,7 @@ local function make_backend(API, msg_buf, opts, state)
         curl_opts.callback = curl_callback(mode)
       end
 
+      -- close_buffer() is called by the callbacks.
       msg_buf:open_buffer(mode)
       local response = require('plenary.curl').post(opts.url, curl_opts)
       if not response then

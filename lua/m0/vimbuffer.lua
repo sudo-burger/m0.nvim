@@ -2,16 +2,17 @@
 ---@field opts? M0.Config
 ---@field buf_id? integer
 ---@field win_id? integer
----@field cursor? table
----@field new? fun(self:M0.VimBuffer, opts:table):M0.VimBuffer
----@field get_visual_selection_lines? fun(self:M0.VimBuffer):string[]
----@field get_messages? fun(self:M0.VimBuffer):string[]
----@field open_buffer? fun(self:M0.VimBuffer, mode:string)
----@field close_buffer? fun(self:M0.VimBuffer, mode:string)
----@field put_response? fun(self:M0.VimBuffer, response:string, opts?:table):boolean,string?
----@field append_section_mark? fun(self:M0.VimBuffer)
+---@field cursor table
+---@field new fun(self:M0.VimBuffer, opts:table):M0.VimBuffer
+---@field get_messages fun(self:M0.VimBuffer):string[]
+---@field open_buffer fun(self:M0.VimBuffer, mode:string)
+---@field close_buffer fun(self:M0.VimBuffer, mode:string)
+---@field put_response fun(self:M0.VimBuffer, response:string, opts?:table):boolean,string?
+---@field private append_section_mark fun(self:M0.VimBuffer)
+---@field private get_visual_selection_lines? fun(self:M0.VimBuffer):string[]
 
 ---@type M0.VimBuffer
+---@diagnostic disable-next-line: missing-fields
 local M = {
   opts = nil,
   win_id = nil,
@@ -57,7 +58,7 @@ end
 
 ---Get the currently selected text.
 ---@return string[]
-function M:get_visual_selection_lines()
+local function get_visual_selection_lines(self)
   local startline, endline = get_visual_selection_line_span()
   return vim.api.nvim_buf_get_lines(self.buf_id, startline - 1, endline, false)
 end
@@ -83,7 +84,7 @@ function M:get_messages()
   -- If we are in visual mode, read the conversation from the visual selection.
   -- Otherwise use the whole current buffer as input.
   if in_visual_mode() then
-    conversation = self:get_visual_selection_lines()
+    conversation = get_visual_selection_lines(self)
   else
     conversation = vim.api.nvim_buf_get_lines(self.buf_id, 0, -1, false)
   end
@@ -106,7 +107,7 @@ function M:get_messages()
   return messages
 end
 
-function M:append_section_mark()
+local function append_section_mark(self)
   -- Line index -1 refers to the index past the end of the buffer.
   vim.api.nvim_buf_set_lines(self.buf_id, -1, -1, false, {
     self.opts.section_mark,
@@ -123,7 +124,7 @@ function M:open_buffer(mode)
   self.win_id = vim.api.nvim_get_current_win()
 
   if mode == 'chat' then
-    self:append_section_mark()
+    append_section_mark(self)
     -- Move the cursor to the start of the last line, preparing for text to be
     -- inserted.
     self.cursor = { vim.api.nvim_buf_line_count(self.buf_id), 0 }
@@ -150,7 +151,7 @@ end
 
 function M:close_buffer(mode)
   if mode == 'chat' then
-    self:append_section_mark()
+    append_section_mark(self)
     -- Move cursor to end of document, preparing for the next turn.
     vim.api.nvim_win_set_cursor(
       self.win_id,

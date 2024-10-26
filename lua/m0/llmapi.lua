@@ -11,10 +11,16 @@
 ---@field make_body fun(self:M0.LLMAPI, messages:string[]):table Make the API request body.
 ---@field make_headers fun(self:M0.LLMAPI):table Make the API request headers.
 ---@field get_messages fun(self:M0.LLMAPI, messages:string[]):string[] Get the chat messages in API format.
----@field get_response_text fun(self:M0.LLMAPI, data:string):boolean,string?,string? Get the text content of an API response.
----Returns delta_event,data
----where
----  data: the delta text (for delta_event "delta"), or the http body for other events.
+---Get the text content of a non-streaming API response.
+---Returns:
+---  success: boolean
+---  data: the response text if successful, or an error string otherwise.
+---  stats: stats if successful, otherwise nil.
+---@field get_response_text fun(self:M0.LLMAPI, data:string):boolean,string,string?
+---Extract a streaming response's content.
+---
+---Returns: delta event, response
+---where response is the delta text (when delta event is "delta"), or an error string.
 ---@async
 ---@field get_delta_text fun(LLMAPI:M0.LLMAPI, body:string):DeltaEventType,string
 

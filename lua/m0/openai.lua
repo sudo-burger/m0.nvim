@@ -21,39 +21,7 @@ function M:new(opts, state)
   )
 end
 
----@param messages string[]
----@return table
-function M:make_body(messages)
-  -- Handle model-specific defaults.
-  local model_defaults = vim.tbl_filter(function(t)
-    return t.name == self.opts.model.name
-  end, self.opts.models)
-
-  local body = {
-    model = self.opts.model.name,
-    temperature = self.opts.temperature,
-    stream = self.opts.stream,
-    max_completion_tokens = self.opts.max_completion_tokens
-      or model_defaults[1].max_completion_tokens,
-    messages = self:make_messages(messages),
-  }
-
-  if self.opts.stream and self.state.log_level <= vim.log.levels.DEBUG then
-    body.stream_options = {
-      include_usage = true,
-    }
-  end
-  return body
-end
-
-function M:make_headers()
-  return {
-    content_type = 'application/json',
-    authorization = 'Bearer ' .. self.opts.api_key(),
-  }
-end
-
-function M:make_messages(raw_messages)
+local function make_messages(self, raw_messages)
   ---@type M0.OpenAIMessage[]
   local messages = {}
   local role = 'user'
@@ -77,6 +45,38 @@ function M:make_messages(raw_messages)
     i = i + 1
   end
   return messages
+end
+
+---@param messages string[]
+---@return table
+function M:make_body(messages)
+  -- Handle model-specific defaults.
+  local model_defaults = vim.tbl_filter(function(t)
+    return t.name == self.opts.model.name
+  end, self.opts.models)
+
+  local body = {
+    model = self.opts.model.name,
+    temperature = self.opts.temperature,
+    stream = self.opts.stream,
+    max_completion_tokens = self.opts.max_completion_tokens
+      or model_defaults[1].max_completion_tokens,
+    messages = make_messages(self, messages),
+  }
+
+  if self.opts.stream and self.state.log_level <= vim.log.levels.DEBUG then
+    body.stream_options = {
+      include_usage = true,
+    }
+  end
+  return body
+end
+
+function M:make_headers()
+  return {
+    content_type = 'application/json',
+    authorization = 'Bearer ' .. self.opts.api_key(),
+  }
 end
 
 function M:get_response_text(data)

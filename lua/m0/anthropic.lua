@@ -23,53 +23,7 @@ function M:new(opts, state)
   )
 end
 
-function M:make_body(messages)
-  local system
-
-  -- The "prompt caching" feature replaces the body.system element with
-  -- a list of system elements.
-  if self.opts.anthropic_beta then
-    system = {
-      { type = 'text', text = self.state.prompt },
-    }
-    -- If we have access to prompt caching and we are scanning the project,
-    -- ensure that the project context is cached.
-    if self.state.scan_project == true then
-      table.insert(system, {
-        type = 'text',
-        text = self.state.project_context,
-        cache_control = { type = 'ephemeral' },
-      })
-    end
-  else
-    system = self.state.prompt
-  end
-
-  -- Handle model-specific defaults.
-  local model_defaults = vim.tbl_filter(function(t)
-    return t.name == self.opts.model.name
-  end, self.opts.models)
-
-  return {
-    model = self.opts.model.name,
-    temperature = self.opts.temperature,
-    stream = self.opts.stream,
-    max_tokens = self.opts.max_tokens or model_defaults[1].max_tokens,
-    system = system,
-    messages = self:make_messages(messages),
-  }
-end
-
-function M:make_headers()
-  return {
-    content_type = 'application/json',
-    x_api_key = self.opts.api_key(),
-    anthropic_version = self.opts.anthropic_version,
-    anthropic_beta = self.opts.anthropic_beta,
-  }
-end
-
-function M:make_messages(raw_messages)
+local function make_messages(self, raw_messages)
   ---@type M0.AnthropicMessage[]
   local messages = {}
 
@@ -114,6 +68,52 @@ function M:make_messages(raw_messages)
     end
   end
   return messages
+end
+
+function M:make_body(messages)
+  local system
+
+  -- The "prompt caching" feature replaces the body.system element with
+  -- a list of system elements.
+  if self.opts.anthropic_beta then
+    system = {
+      { type = 'text', text = self.state.prompt },
+    }
+    -- If we have access to prompt caching and we are scanning the project,
+    -- ensure that the project context is cached.
+    if self.state.scan_project == true then
+      table.insert(system, {
+        type = 'text',
+        text = self.state.project_context,
+        cache_control = { type = 'ephemeral' },
+      })
+    end
+  else
+    system = self.state.prompt
+  end
+
+  -- Handle model-specific defaults.
+  local model_defaults = vim.tbl_filter(function(t)
+    return t.name == self.opts.model.name
+  end, self.opts.models)
+
+  return {
+    model = self.opts.model.name,
+    temperature = self.opts.temperature,
+    stream = self.opts.stream,
+    max_tokens = self.opts.max_tokens or model_defaults[1].max_tokens,
+    system = system,
+    messages = make_messages(self, messages),
+  }
+end
+
+function M:make_headers()
+  return {
+    content_type = 'application/json',
+    x_api_key = self.opts.api_key(),
+    anthropic_version = self.opts.anthropic_version,
+    anthropic_beta = self.opts.anthropic_beta,
+  }
 end
 
 function M:get_response_text(data)

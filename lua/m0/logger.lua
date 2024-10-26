@@ -19,11 +19,12 @@ function M:new(opts)
 end
 
 local function _logger(self, level)
+  return vim.schedule_wrap(function(message)
     if self.opts.log_level > level then
       return
     end
     vim.notify(message or '', level)
-  end
+  end)
 end
 
 function M:log_trace(message)

@@ -8,7 +8,7 @@ local Utils = require 'm0.utils'
 
 ---@class M0.Anthropic:M0.LLMAPI
 ---@field new fun(self:M0.LLMAPI, backend_opts:M0.BackendOptions, state: table):M0.LLMAPI
----@field get_messages fun(self:M0.Anthropic, messages:string[]):M0.AnthropicMessage[]
+---@field private make_messages fun(self:M0.Anthropic, messages:string[]):M0.AnthropicMessage[]
 ---@field opts table
 ---@field state table
 
@@ -56,7 +56,7 @@ function M:make_body(messages)
     stream = self.opts.stream,
     max_tokens = self.opts.max_tokens or model_defaults[1].max_tokens,
     system = system,
-    messages = self:get_messages(messages),
+    messages = self:make_messages(messages),
   }
 end
 
@@ -69,7 +69,7 @@ function M:make_headers()
   }
 end
 
-function M:get_messages(raw_messages)
+function M:make_messages(raw_messages)
   ---@type M0.AnthropicMessage[]
   local messages = {}
 
@@ -127,9 +127,6 @@ function M:get_response_text(data)
   return true, json.content[1].text, vim.inspect(json.usage or '')
 end
 
--- FIXME: the function processes streaming messages; the name could be
--- improved. Maybe just "stream()"?
--- What is the SDK standard, if any?
 function M:get_delta_text(body)
   if body and string.find(body, '^data: ') then
     local json, msg = Utils:json_decode(string.sub(body, 7))

@@ -7,7 +7,7 @@ local Utils = require 'm0.utils'
 
 ---@class M0.OpenAI :M0.LLMAPI
 ---@field new fun(self:M0.LLMAPI, backend_opts:M0.BackendOptions, state: table):M0.LLMAPI
----@field get_messages fun(self:M0.OpenAI, messages:string[]):M0.OpenAIMessage[]
+---@field private make_messages fun(self:M0.OpenAI, messages:string[]):M0.OpenAIMessage[]
 ---@field opts table
 ---@field state table
 
@@ -35,7 +35,7 @@ function M:make_body(messages)
     stream = self.opts.stream,
     max_completion_tokens = self.opts.max_completion_tokens
       or model_defaults[1].max_completion_tokens,
-    messages = self:get_messages(messages),
+    messages = self:make_messages(messages),
   }
 
   if self.opts.stream and self.state.log_level <= vim.log.levels.DEBUG then
@@ -53,7 +53,7 @@ function M:make_headers()
   }
 end
 
-function M:get_messages(raw_messages)
+function M:make_messages(raw_messages)
   ---@type M0.OpenAIMessage[]
   local messages = {}
   local role = 'user'

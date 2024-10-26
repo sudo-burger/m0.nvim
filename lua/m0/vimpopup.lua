@@ -66,10 +66,6 @@ function M:popup(txt, exit_callback, opts)
     return nil, 'Unable to create popup window.'
   end
 
-  -- Set options.
-  -- FIXME: 'tw' doesn't achieve the desired line wrapping.
-  -- vim.api.nvim_set_option_value('tw', width, { buf = buf_id })
-
   -- Bind q to quit popup.
   -- FIXME: document.
   vim.keymap.set('n', 'q', function()

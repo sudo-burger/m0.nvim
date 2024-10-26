@@ -69,6 +69,7 @@ local function make_backend(API, msg_buf, opts, state)
     return true
   end
 
+  ---Returns a streaming callback for the given mode.
   ---@param mode backend_mode
   local function curl_stream_callback(mode)
     return vim.schedule_wrap(function(err, out, _job)
@@ -106,8 +107,10 @@ local function make_backend(API, msg_buf, opts, state)
     end)
   end
 
+  ---Returns a non-streaming callback for the given mode.
   ---@param mode backend_mode
   local function curl_callback(mode)
+    --- FIXME: move the schedule wrap to vimbuffer.
     return vim.schedule_wrap(function(out)
       if out and out.status and (out.status < 200 or out.status > 299) then
         M.Logger:log_error('Error in response: ' .. vim.inspect(out))
@@ -129,6 +132,9 @@ local function make_backend(API, msg_buf, opts, state)
     end)
   end
 
+  ---Returns the "action function" for the given mode.
+  ---@param mode backend_mode
+  ---@return fun()
   local function make_action(mode)
     return function()
       local success, err

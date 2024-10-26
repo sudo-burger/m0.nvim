@@ -10,8 +10,6 @@
 ---@field close_buffer? fun(self:M0.VimBuffer, mode:string)
 ---@field put_response? fun(self:M0.VimBuffer, response:string, opts?:table):boolean,string?
 ---@field append_section_mark? fun(self:M0.VimBuffer)
----@field get_last_line? fun(self:M0.VimBuffer):string
----@field set_last_line? fun(self:M0.VimBuffer, txt:string)
 
 ---@type M0.VimBuffer
 local M = {
@@ -106,27 +104,6 @@ function M:get_messages()
     i = i + 1
   end
   return messages
-end
-
---- Get the last line of the buffer.
----@return string
-function M:get_last_line()
-  -- Neovim manual: ... to get the last element use start=-2 and end=-1.
-  return table.concat(vim.api.nvim_buf_get_lines(self.buf_id, -2, -1, false))
-end
-
---- Replace the last line of the buffer with the given text.
----@param txt string
-function M:set_last_line(txt)
-  vim.api.nvim_buf_set_lines(
-    self.buf_id,
-    -2,
-    -1,
-    false,
-    -- If the input contains multiple lines,
-    -- split them as required by nvim_buf_get_lines()
-    vim.fn.split(txt, '\n', true)
-  )
 end
 
 function M:append_section_mark()

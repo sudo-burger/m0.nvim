@@ -131,13 +131,12 @@ end
 
 function M:append_section_mark()
   -- Line index -1 refers to the index past the end of the buffer.
-  vim.api.nvim_buf_set_lines(
-    self.buf_id,
-    -1,
-    -1,
-    false,
-    { self.opts.section_mark, ' ' }
-  )
+  vim.api.nvim_buf_set_lines(self.buf_id, -1, -1, false, {
+    self.opts.section_mark,
+    -- Insert an empty line as placeholder for the new section.
+    -- FIXME: the empty string should work here, but it garbles the LLM's response.
+    ' ',
+  })
 end
 
 --- Open/close a response.
@@ -160,6 +159,7 @@ function M:open_buffer(mode)
       startline - 1,
       endline,
       false,
+      -- FIXME: the empty string works here, but we use a space to be consistent with append_section_mark().
       { ' ' }
     )
     -- Move the cursor to the start of the empty line we just created, preparing

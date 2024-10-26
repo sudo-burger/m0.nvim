@@ -3,11 +3,12 @@
 ## Introduction
 Yet another Neovim plugin interacting with LLMs.
 
-Goals:
+* Chat and rewrite modes.
+* Project scan (adds repo code to context).
+  * Supports Anthropic prompt caching (OpenAI caching is implicit).
 * Configure any number of LLM backends and prompts.
-* Switch backends and prompts, even mid-conversation.
+* Switch backends and prompts at any time.
 * Minimal codebase.
-* Learn some Lua, have fun.
 
 Supported APIs:
 * OpenAI: completions (https://platform.openai.com/docs/api-reference/making-requests)
@@ -61,9 +62,11 @@ return {
     section_mark = '-*-*-*-*-*-*-*-*-',
   },
   keys = {
-    { '<leader>ax', '<Plug>(M0 chat)', desc = 'M0 chat', mode = { 'n', 'v' } },
-    { '<leader>ap', '<Plug>(M0 prompt)', desc = 'M0 prompt' },
     { '<leader>ab', '<Plug>(M0 backend)', desc = 'M0 backend' },
+    { '<leader>ac', '<Plug>(M0 chat)', desc = 'M0 chat', mode = { 'n', 'v' } },
+    { '<leader>ai', '<Plug>(M0 info)', desc = 'M0 info' },
+    { '<leader>ap', '<Plug>(M0 prompt)', desc = 'M0 prompt' },
+    { '<leader>ar', '<Plug>(M0 rewrite)', desc = 'M0 rewrite', mode = { 'v' } },
     { '<leader>as', '<Plug>(M0 scan_project)', desc = 'M0 scan_project' },
   },
 }
@@ -71,10 +74,11 @@ return {
 
 ## Usage
 - ":M0 chat" start/continue chat.
+- ":M0 rewrite" rewrite selected text.
 - ":M0 scan_project" include the current project as conversation context.
-  - Prompt caching used when supported.
-- ":M0 backend" to select a backend.
-- ":M0 prompt" to select a prompt.
+- ":M0 backend": select a backend.
+- ":M0 prompt":  select a prompt.
+* ":M0 info": show status and configuration.
 
 ## Similar Projects
 - [karthink/GPTel](https://github.com/karthink/gptel)

@@ -40,12 +40,12 @@ describe('m0.nvim', function()
   local original_state
 
   before_each(function()
-    original_state = vim.deepcopy(M0.State)
+    original_state = vim.deepcopy(M0.state)
     M0.setup(mock_config)
   end)
 
   after_each(function()
-    M0.State = original_state
+    M0.state = original_state
   end)
 
   describe('setup', function()
@@ -56,11 +56,11 @@ describe('m0.nvim', function()
     end)
 
     it('initializes with the default backend', function()
-      assert.equals('openai:gpt-3.5-turbo', M0.State.backend.opts.name)
+      assert.equals('openai:gpt-3.5-turbo', M0.state.backend.opts.name)
     end)
 
     it('initializes with the default prompt', function()
-      assert.equals('You are a helpful assistant.', M0.State.prompt)
+      assert.equals('You are a helpful assistant.', M0.state.prompt)
     end)
 
     it('should validate configuration', function()
@@ -95,10 +95,10 @@ describe('m0.nvim', function()
   end)
   describe('backend management', function()
     it('can change the backend', function()
-      local initial_backend = M0.State.backend.opts.name
+      local initial_backend = M0.state.backend.opts.name
       M0:M0backend 'anthropic:claude-3-haiku'
-      assert.are_not.equal(initial_backend, M0.State.backend.opts.name)
-      assert.equals('anthropic:claude-3-haiku', M0.State.backend.opts.name)
+      assert.are_not.equal(initial_backend, M0.state.backend.opts.name)
+      assert.equals('anthropic:claude-3-haiku', M0.state.backend.opts.name)
     end)
 
     it('should throw an error for non-existent backend', function()
@@ -110,10 +110,10 @@ describe('m0.nvim', function()
 
   describe('prompt management', function()
     it('can change the prompt', function()
-      local initial_prompt = M0.State.prompt
+      local initial_prompt = M0.state.prompt
       M0:M0prompt 'Code reviewer'
-      assert.are_not.equal(initial_prompt, M0.State.prompt)
-      assert.equals('You are a code reviewer.', M0.State.prompt)
+      assert.are_not.equal(initial_prompt, M0.state.prompt)
+      assert.equals('You are a code reviewer.', M0.state.prompt)
     end)
 
     it('should throw an error for non-existent prompt', function()
@@ -162,13 +162,13 @@ describe('m0.nvim', function()
     end)
 
     it('should scan project when enabled', function()
-      M0.State.scan_project = true
+      M0.state.scan_project = true
       M0:chat()
       assert.stub(require('m0.scanproject').get_context).was_called()
     end)
 
     it('should not scan project when disabled', function()
-      M0.State.scan_project = false
+      M0.state.scan_project = false
       M0:chat()
       assert.stub(require('m0.scanproject').get_context).was_not_called()
     end)

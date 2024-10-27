@@ -23,8 +23,10 @@ local Config = require 'm0.config'
 ---@field State State
 ---@field Config M0.Config
 ---@field private scan_project fun(self:M0):boolean,string?
----@field private make_action fun(self:M0, mode:backend_mode):fun()
 ---@field private make_curl_opts fun(self:M0, API:M0.LLMAPI):table
+---@field private curl_callback fun(self:M0, API:M0.LLMAPI, mode:backend_mode):fun(out:string)
+---@field private curl_stream_callback fun(self:M0, API:M0.LLMAPI, mode:backend_mode):fun(err:string,out:string,_job:table)
+---@field private make_action fun(self:M0, mode:backend_mode):fun()
 ---@field private make_backend fun()
 local M = {
   State = {},
@@ -58,8 +60,12 @@ local function make_curl_opts(self, API)
     body = vim.json.encode(body),
   }
 end
+---
 ---Returns a non-streaming callback for the given mode.
+---@param self M0
+---@param API M0.LLMAPI
 ---@param mode backend_mode
+---@return fun(out:string)
 local function curl_callback(self, API, mode)
   --- FIXME: move the schedule wrap to vimbuffer.
   return vim.schedule_wrap(function(out)
@@ -84,7 +90,10 @@ local function curl_callback(self, API, mode)
 end
 
 ---Returns a streaming callback for the given mode.
+---@param self M0
+---@param API M0.LLMAPI
 ---@param mode backend_mode
+---@return fun(err:string,out:string, _job:table)
 local function curl_stream_callback(self, API, mode)
   return vim.schedule_wrap(function(err, out, _job)
     M.Logger:log_trace(

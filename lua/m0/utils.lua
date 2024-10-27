@@ -24,7 +24,7 @@ end
 --- @return table? json The decoded object, or nil if decoding fails.
 --- @return string? error Error message.
 function M:json_decode(data)
-  return self:safe_call(vim.fn.json_decode, data)
+  return self:safe_call(vim.json.decode, data)
 end
 
 return M

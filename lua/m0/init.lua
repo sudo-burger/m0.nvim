@@ -207,12 +207,14 @@ function M:M0backend(backend_name)
     { name = backend_name }
   )
 
-  ---@type boolean,M0.LLMAPI|string
   local success, API =
     LLMAPIFactory.create(backend_opts.api_type, backend_opts, M.State)
   if not success then
     self.Logger:log_error(
-      'Unable create API for ' .. backend_opts.api_type .. ': ' .. (API or '')
+      'Unable create API for '
+        .. backend_opts.api_type
+        .. ': '
+        .. (API.error or '')
     )
     return
   end

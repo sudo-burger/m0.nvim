@@ -33,6 +33,10 @@ end
 function M:put_response(txt)
   -- Assumes that self.cursor has been set in open_buffer() before the first
   -- call.
+
+  -- Put the cursor back where it should be, in case it was moved by the user.
+  vim.api.nvim_win_set_cursor(self.win_id, self.cursor)
+
   vim.api.nvim_buf_set_text(
     self.buf_id,
     self.cursor[1] - 1,

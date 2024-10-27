@@ -50,9 +50,10 @@
 ---@field log_level? integer See vim.log.loglevel
 ---@field default_backend_name? string
 ---@field default_prompt_name? string
----@field validate? fun(self:M0.Config):boolean,string
+---@field validate fun(self:M0.Config):boolean,string?
 
 ---@type M0.Config
+---@diagnostic disable-next-line: missing-fields
 local M = {
   log_level = vim.log.levels.WARN,
   providers = {},
@@ -180,7 +181,7 @@ function M:validate()
   if next(errors) ~= nil then
     return false, vim.inspect(errors)
   end
-  return true, ''
+  return true
 end
 
 return M

@@ -30,9 +30,10 @@ local Config = require 'm0.config'
 ---@field private curl_stream_callback fun(self:M0, API:M0.LLMAPI, mode:backend_mode):fun(err:string,out:string,_job:table)
 ---@field private make_action fun(self:M0, mode:backend_mode):fun()
 ---@field private make_backend fun()
+---@field private init_logger fun(self:M0, log_level:integer)
+---@field private setup_user_commands fun()
 local M = {
   state = {},
-  config = Config,
 }
 M.__index = M
 
@@ -245,10 +246,10 @@ function M:M0prompt(prompt_name)
   self.state.prompt = self.config.prompts[prompt_name]
 end
 
----@return nil
 function M:chat()
   M.state.backend.chat()
 end
+
 function M:rewrite()
   M.state.backend.rewrite()
 end
@@ -262,67 +263,58 @@ function M:debug()
     .. vim.inspect(self.config)
 end
 
---- Sets up the m0 plugin.
----@param user_config table The user configuration.
-function M.setup(user_config)
-  -- Merge user configuration, overriding defaults.
-  M.config = vim.tbl_extend('force', M.config, user_config or {})
-
-  -- Init the backend logger.
-  M.state.log_level = M.config.log_level or vim.log.levels.WARN
-  M.logger = Logger:new {
-    log_level = M.state.log_level,
+local function create_keymaps()
+  local keymaps = {
+    {
+      mode = { 'n' },
+      lhs = '<Plug>(M0 backend)',
+      rhs = ':M0 backend<CR>',
+      opts = { noremap = true, silent = true },
+    },
+    {
+      mode = { 'n', 'v' },
+      lhs = '<Plug>(M0 chat)',
+      rhs = M.chat,
+      opts = { noremap = true, silent = true },
+    },
+    {
+      mode = { 'n' },
+      lhs = '<Plug>(M0 prompt)',
+      rhs = ':M0 prompt<CR>',
+      opts = { noremap = true, silent = true },
+    },
+    {
+      mode = { 'v' },
+      lhs = '<Plug>(M0 rewrite)',
+      rhs = M.rewrite,
+      opts = { noremap = true, silent = true },
+    },
+    {
+      mode = { 'n' },
+      lhs = '<Plug>(M0 scan_project)',
+      rhs = ':M0 scan_project<CR>',
+      opts = { noremap = true, silent = true },
+    },
+    {
+      mode = { 'n' },
+      lhs = '<Plug>(M0 info)',
+      rhs = ':M0 info<CR>',
+      opts = { noremap = true, silent = true },
+    },
   }
 
-  -- Sanity checks.
-  local success, error = M.config:validate()
-  if not success then
-    M.logger:log_error(error)
-    return
+  for _, v in ipairs(keymaps) do
+    vim.keymap.set(v.mode, v.lhs, v.rhs, v.opts or {})
   end
+end
 
-  -- Activate defaults.
-  M:M0prompt(M.config.default_prompt_name)
-  M:M0backend(M.config.default_backend_name)
+local function init_logger(self)
+  -- Init the backend logger.
+  self.state.log_level = self.config.log_level or vim.log.levels.WARN
+  self.logger = Logger:new { log_level = self.state.log_level }
+end
 
-  -- Create keymaps.
-  vim.keymap.set(
-    { 'n' },
-    '<Plug>(M0 backend)',
-    ':M0 backend<CR>',
-    { noremap = true, silent = true }
-  )
-  vim.keymap.set(
-    { 'n', 'v' },
-    '<Plug>(M0 chat)',
-    M.chat,
-    { noremap = true, silent = true }
-  )
-  vim.keymap.set(
-    { 'n' },
-    '<Plug>(M0 prompt)',
-    ':M0 prompt<CR>',
-    { noremap = true, silent = true }
-  )
-  vim.keymap.set(
-    { 'v' },
-    '<Plug>(M0 rewrite)',
-    M.rewrite,
-    { noremap = true, silent = true }
-  )
-  vim.keymap.set(
-    { 'n' },
-    '<Plug>(M0 scan_project)',
-    ':M0 scan_project<CR>',
-    { noremap = true, silent = true }
-  )
-  vim.keymap.set(
-    { 'n' },
-    '<Plug>(M0 info)',
-    ':M0 info<CR>',
-    { noremap = true, silent = true }
-  )
-
+local function setup_user_commands()
   -- User commands
   -- See: https://github.com/nvim-neorocks/nvim-best-practices?tab=readme-ov-file
   -- -------------
@@ -434,6 +426,31 @@ function M.setup(user_config)
     end,
     bang = true, -- If you want to support !-modifiers
   })
+end
+
+-- Sets up the m0 plugin.
+---@param user_config table The user configuration.
+function M.setup(user_config)
+  -- Merge user configuration, overriding defaults.
+  M.config = vim.tbl_extend('force', Config, user_config or {})
+
+  -- Init logger as early as possible, so we can get proper error logging if
+  -- setup fails.
+  init_logger(M)
+
+  -- Sanity checks.
+  local success, error = M.config:validate()
+  if not success then
+    M.logger:log_error(error)
+    return
+  end
+
+  -- Activate defaults.
+  M:M0prompt(M.config.default_prompt_name)
+  M:M0backend(M.config.default_backend_name)
+
+  create_keymaps()
+  setup_user_commands()
 end
 
 return M

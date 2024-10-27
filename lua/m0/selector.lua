@@ -1,4 +1,10 @@
 --- @class M0.Selector
+--- A single-item selector.
+--- The selector requires the items to be in the format
+--- {
+---   ( k = "foo", v = "bar" },
+---   ( k = "baz", v = "boz" },
+--- }
 --- @field make_selector fun(self:M0.Selector, opts: table, callback: fun(opts: table)):fun():nil
 
 local pickers = require 'telescope.pickers'
@@ -64,7 +70,6 @@ local make_selector = function(opts, title, results, callback)
   end
 end
 
---- A single-item selector.
 --- @param items table Items to select.
 --- @param callback fun(opts: table):nil A callback to be called on selection.
 --- @return fun():nil

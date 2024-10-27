@@ -36,7 +36,7 @@ M.__index = M
 ---@type M0.VimBuffer
 local VimBuffer = require 'm0.vimbuffer'
 
----@param API M0.LLMAPI The API handler.
+---@param API M0.LLMAPI
 ---@param msg_buf M0.VimBuffer
 ---@param opts M0.BackendOptions
 ---@param state State
@@ -328,11 +328,6 @@ function M.setup(user_config)
     -- What backend to use.
     backend = {
       impl = function(_, _)
-        -- The selector requires the items to be in the format
-        -- {
-        --   ( k = "foo", v = "bar" },
-        --   ( k = "baz", v = "boz" },
-        -- }
         local items = {}
         for k, v in pairs(M.Config.backends) do
           table.insert(items, { k = k, v = vim.inspect(v) })
@@ -356,11 +351,6 @@ function M.setup(user_config)
     -- What prompt to use.
     prompt = {
       impl = function(_, _)
-        -- The selector requires the items to be in the format
-        -- {
-        --   ( k = "foo", v = "bar" },
-        --   ( k = "baz", v = "boz" },
-        -- }
         local items = {}
         for k, v in pairs(M.Config.prompts) do
           table.insert(items, { k = k, v = v })

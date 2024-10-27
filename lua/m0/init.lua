@@ -1,14 +1,8 @@
----@type M0.Logger
 local Logger = require 'm0.logger'
-
----@type M0.LLMAPIFactory
 local LLMAPIFactory = require 'm0.llmapifactory'
-
----@type M0.Selector
 local Selector = require 'm0.selector'
-
----@type M0.Utils
 local Utils = require 'm0.utils'
+local Config = require 'm0.config'
 
 ---@alias backend_mode 'chat' | 'rewrite'
 
@@ -25,145 +19,145 @@ local Utils = require 'm0.utils'
 ---@field scan_project boolean?
 ---@field project_context string?
 
+---@class M0
+---@field State State
+---@field Config M0.Config
+---@field private scan_project fun(self:M0):boolean,string?
+---@field private make_action fun(self:M0, mode:backend_mode):fun()
+---@field private make_curl_opts fun(self:M0, API:M0.LLMAPI):table
+---@field private make_backend fun()
 local M = {
-  ---@type State
   State = {},
-  ---@type M0.Config
-  Config = require 'm0.config',
+  Config = Config,
 }
 M.__index = M
 
----@type M0.VimBuffer
-local VimBuffer = require 'm0.vimbuffer'
-
----@param API M0.LLMAPI
----@param msg_buf M0.VimBuffer
----@param opts M0.BackendOptions
----@param state State
----@return Backend
-local function make_backend(API, msg_buf, opts, state)
-  local function make_curl_opts()
-    local messages = msg_buf:get_messages()
-    local body = API:make_body(messages)
-    return {
-      headers = API:make_headers(),
-      body = vim.fn.json_encode(body),
-    }
-  end
-
-  ---@return boolean success
-  ---@return string? err
-  local function scan_project()
-    if state.scan_project ~= true then
-      return true
-    end
-    -- If a scan of the project has been requested,
-    -- re-scan on every turn, to catch code changes.
-    -- FIXME: don't assume that cwd is project's root.
-    local success, context =
-      require('m0.scanproject'):get_context(vim.fn.getcwd())
-    if not success then
-      return false, 'Unable to scan project: ' .. context
-    end
-    state.project_context = context
+---@return boolean success
+---@return string? err
+local function scan_project(self)
+  if self.State.scan_project ~= true then
     return true
   end
-
-  ---Returns a streaming callback for the given mode.
-  ---@param mode backend_mode
-  local function curl_stream_callback(mode)
-    return vim.schedule_wrap(function(err, out, _job)
-      M.Logger:log_trace(
-        'Err: ' .. (err or '') .. '\nOut: ' .. (out or '')
-        -- .. '\nJob: '
-        -- .. (vim.inspect(_job) or '')
-      )
-      if err then
-        M.Logger:log_error('Stream error: [' .. err .. '] [' .. out .. ']')
-        return
-      end
-      -- When streaming, it seems the best chance to catch an API error
-      -- is to parse stdout.
-      if _job._stdout_results ~= {} then
-        local json, _ = Utils:json_decode(_job._stdout_results)
-        if json and json.error then
-          M.Logger:log_error('Stream error: [' .. vim.inspect(json) .. ']')
-          return
-        end
-      end
-
-      local event, d = API:get_delta_text(out)
-      if event == 'delta' then
-        msg_buf:put_response(d)
-      elseif event == 'error' then
-        M.Logger:log_error(d)
-      elseif event == 'stats' then
-        M.Logger:log_info(d)
-      elseif event == 'done' then
-        msg_buf:close_buffer(mode)
-      elseif d then
-        M.Logger:log_trace('Unhandled stream results: ' .. d)
-      end
-    end)
+  -- If a scan of the project has been requested,
+  -- re-scan on every turn, to catch code changes.
+  -- FIXME: don't assume that cwd is project's root.
+  local success, context =
+    require('m0.scanproject'):get_context(vim.fn.getcwd())
+  if not success then
+    return false, 'Unable to scan project: ' .. context
   end
+  self.State.project_context = context
+  return true
+end
 
-  ---Returns a non-streaming callback for the given mode.
-  ---@param mode backend_mode
-  local function curl_callback(mode)
-    --- FIXME: move the schedule wrap to vimbuffer.
-    return vim.schedule_wrap(function(out)
-      if out and out.status and (out.status < 200 or out.status > 299) then
-        M.Logger:log_error('Error in response: ' .. vim.inspect(out))
+local function make_curl_opts(self, API)
+  local messages = self.msg_buf:get_messages()
+  local body = API:make_body(messages)
+  return {
+    headers = API:make_headers(),
+    body = vim.json.encode(body),
+  }
+end
+---Returns a non-streaming callback for the given mode.
+---@param mode backend_mode
+local function curl_callback(self, API, mode)
+  --- FIXME: move the schedule wrap to vimbuffer.
+  return vim.schedule_wrap(function(out)
+    if out and out.status and (out.status < 200 or out.status > 299) then
+      self.Logger:log_error('Error in response: ' .. vim.inspect(out))
+      return
+    end
+
+    local success, response, stats = API:get_response_text(out.body)
+    if not success then
+      self.Logger:log_error('Failed to parse response: ' .. vim.inspect(out))
+      return
+    end
+    if response then
+      self.msg_buf:put_response(response)
+      self.msg_buf:close_buffer(mode)
+    end
+    if stats then
+      self.Logger:log_info(stats)
+    end
+  end)
+end
+
+---Returns a streaming callback for the given mode.
+---@param mode backend_mode
+local function curl_stream_callback(self, API, mode)
+  return vim.schedule_wrap(function(err, out, _job)
+    M.Logger:log_trace(
+      'Err: ' .. (err or '') .. '\nOut: ' .. (out or '')
+      -- .. '\nJob: '
+      -- .. (vim.inspect(_job) or '')
+    )
+    if err then
+      M.Logger:log_error('Stream error: [' .. err .. '] [' .. out .. ']')
+      return
+    end
+    -- When streaming, it seems the best chance to catch an API error
+    -- is to parse stdout.
+    if _job._stdout_results ~= {} then
+      local json, _ = Utils:json_decode(_job._stdout_results)
+      if json and json.error then
+        M.Logger:log_error('Stream error: [' .. vim.inspect(json) .. ']')
         return
-      end
-
-      local success, response, stats = API:get_response_text(out.body)
-      if not success then
-        M.Logger:log_error('Failed to parse response: ' .. vim.inspect(out))
-        return
-      end
-      if response then
-        msg_buf:put_response(response)
-        msg_buf:close_buffer(mode)
-      end
-      if stats then
-        M.Logger:log_info(stats)
-      end
-    end)
-  end
-
-  ---Returns the "action function" for the given mode.
-  ---@param mode backend_mode
-  ---@return fun()
-  local function make_action(mode)
-    return function()
-      local success, err
-      success, err = scan_project()
-      if not success then
-        M.Logger:log_error(err)
-      end
-
-      local curl_opts = make_curl_opts()
-
-      if opts.stream == true then
-        curl_opts.stream = curl_stream_callback(mode)
-      else
-        curl_opts.callback = curl_callback(mode)
-      end
-
-      -- close_buffer() is called by the callbacks.
-      msg_buf:open_buffer(mode)
-      local response = require('plenary.curl').post(opts.url, curl_opts)
-      if not response then
-        M.Logger:log_error 'Failed to obtain CuRL response.'
       end
     end
-  end
 
+    local event, d = API:get_delta_text(out)
+    if event == 'delta' then
+      self.msg_buf:put_response(d)
+    elseif event == 'error' then
+      M.Logger:log_error(d)
+    elseif event == 'stats' then
+      M.Logger:log_info(d)
+    elseif event == 'done' then
+      self.msg_buf:close_buffer(mode)
+    elseif d then
+      M.Logger:log_trace('Unhandled stream results: ' .. d)
+    end
+  end)
+end
+---Returns the "action function" for the given mode.
+---@param mode backend_mode
+---@return fun()
+local function make_action(self, API, mode)
+  return function()
+    local success, err
+    success, err = scan_project(self)
+    if not success then
+      self.Logger:log_error(err)
+    end
+
+    local curl_opts = make_curl_opts(self, API)
+
+    if self.State.backend.opts.stream == true then
+      curl_opts.stream = curl_stream_callback(self, API, mode)
+    else
+      curl_opts.callback = curl_callback(self, API, mode)
+    end
+
+    -- close_buffer() is called by the callbacks.
+    self.msg_buf:open_buffer(mode)
+    local response =
+      require('plenary.curl').post(self.State.backend.opts.url, curl_opts)
+    if not response then
+      self.Logger:log_error 'Failed to obtain CuRL response.'
+    end
+  end
+end
+
+---@param self M0
+---@param API M0.LLMAPI
+---@param opts M0.BackendOptions
+---@return Backend
+local function make_backend(self, API, opts)
   return {
     opts = opts,
-    rewrite = make_action 'rewrite',
-    chat = make_action 'chat',
+    rewrite = make_action(self, API, 'rewrite'),
+    chat = make_action(self, API, 'chat'),
   }
 end
 
@@ -171,7 +165,7 @@ end
 ---@param backend_name string The name of the backend, as found in the user configuration.
 ---@return nil
 function M:M0backend(backend_name)
-  local msg_buf = VimBuffer:new(self.Config)
+  self.msg_buf = require('m0.vimbuffer'):new(self.Config)
   -- Use deepcopy to avoid cluttering the configuration with backend-specific settings.
   local backend_opts = vim.deepcopy(self.Config.backends[backend_name])
   local provider_name = backend_opts.provider
@@ -219,8 +213,7 @@ function M:M0backend(backend_name)
     return
   end
 
-  -- FIXME: constructor, maybe?
-  self.State.backend = make_backend(API, msg_buf, backend_opts, M.State)
+  self.State.backend = make_backend(self, API, backend_opts)
 end
 
 ---Select prompt interactively.

@@ -31,15 +31,15 @@ local Config = require 'm0.config'
 ---@field private make_action fun(self:M0, mode:backend_mode):fun()
 ---@field private make_backend fun()
 local M = {
-  State = {},
-  Config = Config,
+  state = {},
+  config = Config,
 }
 M.__index = M
 
 ---@return boolean Success
 ---@return string? Error
 local function scan_project(self)
-  if self.State.scan_project ~= true then
+  if self.state.scan_project ~= true then
     return true
   end
   -- If a scan of the project has been requested,
@@ -50,7 +50,7 @@ local function scan_project(self)
   if not success then
     return false, 'Unable to scan project: ' .. context
   end
-  self.State.project_context = context
+  self.state.project_context = context
   return true
 end
 
@@ -75,13 +75,13 @@ local function curl_callback(self, API, mode)
   --- FIXME: move the schedule wrap to vimbuffer.
   return vim.schedule_wrap(function(out)
     if out and out.status and (out.status < 200 or out.status > 299) then
-      self.Logger:log_error('Error in response: ' .. vim.inspect(out))
+      self.logger:log_error('Error in response: ' .. vim.inspect(out))
       return
     end
 
     local success, response, stats = API:get_response_text(out.body)
     if not success then
-      self.Logger:log_error('Failed to parse response: ' .. vim.inspect(out))
+      self.logger:log_error('Failed to parse response: ' .. vim.inspect(out))
       return
     end
     if response then
@@ -89,7 +89,7 @@ local function curl_callback(self, API, mode)
       self.msg_buf:close_buffer(mode)
     end
     if stats then
-      self.Logger:log_info(stats)
+      self.logger:log_info(stats)
     end
   end)
 end
@@ -101,13 +101,13 @@ end
 ---@return fun(err:string,out:string, _job:table)
 local function curl_stream_callback(self, API, mode)
   return vim.schedule_wrap(function(err, out, _job)
-    self.Logger:log_trace(
+    self.logger:log_trace(
       'Err: ' .. (err or '') .. '\nOut: ' .. (out or '')
       -- .. '\nJob: '
       -- .. (vim.inspect(_job) or '')
     )
     if err then
-      self.Logger:log_error('Stream error: [' .. err .. '] [' .. out .. ']')
+      self.logger:log_error('Stream error: [' .. err .. '] [' .. out .. ']')
       return
     end
     -- When streaming, it seems the best chance to catch an API error
@@ -115,7 +115,7 @@ local function curl_stream_callback(self, API, mode)
     if _job._stdout_results ~= {} then
       local json, _ = Utils:json_decode(_job._stdout_results)
       if json and json.error then
-        self.Logger:log_error('Stream error: [' .. vim.inspect(json) .. ']')
+        self.logger:log_error('Stream error: [' .. vim.inspect(json) .. ']')
         return
       end
     end
@@ -124,13 +124,13 @@ local function curl_stream_callback(self, API, mode)
     if event == 'delta' then
       self.msg_buf:put_response(d)
     elseif event == 'error' then
-      self.Logger:log_error(d)
+      self.logger:log_error(d)
     elseif event == 'stats' then
-      self.Logger:log_info(d)
+      self.logger:log_info(d)
     elseif event == 'done' then
       self.msg_buf:close_buffer(mode)
     elseif d then
-      self.Logger:log_trace('Unhandled stream results: ' .. d)
+      self.logger:log_trace('Unhandled stream results: ' .. d)
     end
   end)
 end
@@ -145,12 +145,12 @@ local function make_action(self, API, mode)
     local success, err
     success, err = scan_project(self)
     if not success then
-      self.Logger:log_error(err)
+      self.logger:log_error(err)
     end
 
     local curl_opts = make_curl_opts(self, API)
 
-    if self.State.backend.opts.stream == true then
+    if self.state.backend.opts.stream == true then
       curl_opts.stream = curl_stream_callback(self, API, mode)
     else
       curl_opts.callback = curl_callback(self, API, mode)
@@ -159,9 +159,9 @@ local function make_action(self, API, mode)
     -- close_buffer() is called by the callbacks.
     self.msg_buf:open_buffer(mode)
     local response =
-      require('plenary.curl').post(self.State.backend.opts.url, curl_opts)
+      require('plenary.curl').post(self.state.backend.opts.url, curl_opts)
     if not response then
-      self.Logger:log_error 'Failed to obtain CuRL response.'
+      self.logger:log_error 'Failed to obtain CuRL response.'
     end
   end
 end
@@ -181,23 +181,23 @@ end
 ---Select backend interactively.
 ---@param backend_name string The name of the backend, as found in the user configuration.
 function M:M0backend(backend_name)
-  self.msg_buf = require('m0.vimbuffer'):new(self.Config)
+  self.msg_buf = require('m0.vimbuffer'):new(self.config)
   -- Use deepcopy to avoid cluttering the configuration with backend-specific settings.
-  local backend_opts = vim.deepcopy(self.Config.backends[backend_name])
+  local backend_opts = vim.deepcopy(self.config.backends[backend_name])
   local provider_name = backend_opts.provider
-  local provider_opts = vim.deepcopy(self.Config.providers[provider_name])
+  local provider_opts = vim.deepcopy(self.config.providers[provider_name])
   local default_opts =
-    vim.deepcopy(self.Config.defaults.providers[provider_name])
+    vim.deepcopy(self.config.defaults.providers[provider_name])
 
   if not backend_opts then
-    self.Logger:log_error(
+    self.logger:log_error(
       "Backend '" .. backend_name .. "' not in configuration."
     )
     return
   end
 
   if not provider_opts then
-    self.Logger:log_error(
+    self.logger:log_error(
       "Unable to find provider '"
         .. provider_name
         .. "' for backend '"
@@ -218,9 +218,9 @@ function M:M0backend(backend_name)
   )
 
   local success, API =
-    LLMAPIFactory.create(backend_opts.api_type, backend_opts, M.State)
+    LLMAPIFactory.create(backend_opts.api_type, backend_opts, M.state)
   if not success then
-    self.Logger:log_error(
+    self.logger:log_error(
       'Unable create API for '
         .. backend_opts.api_type
         .. ': '
@@ -229,61 +229,61 @@ function M:M0backend(backend_name)
     return
   end
 
-  self.State.backend = make_backend(self, API, backend_opts)
+  self.state.backend = make_backend(self, API, backend_opts)
 end
 
 ---Select prompt interactively.
 ---@param prompt_name string The name of the prompt, as found in the user configuration.
 function M:M0prompt(prompt_name)
-  if self.Config.prompts[prompt_name] == nil then
-    self.Logger:log_error(
+  if self.config.prompts[prompt_name] == nil then
+    self.logger:log_error(
       "Prompt '" .. prompt_name .. "' not in configuration."
     )
     return
   end
-  self.State.prompt_name = prompt_name
-  self.State.prompt = self.Config.prompts[prompt_name]
+  self.state.prompt_name = prompt_name
+  self.state.prompt = self.config.prompts[prompt_name]
 end
 
 ---@return nil
 function M:chat()
-  M.State.backend.chat()
+  M.state.backend.chat()
 end
 function M:rewrite()
-  M.State.backend.rewrite()
+  M.state.backend.rewrite()
 end
 
 ---Returns printable debug information.
 ---@return string
 function M:debug()
   return 'State:\n'
-    .. vim.inspect(self.State)
+    .. vim.inspect(self.state)
     .. '\nConfiguration: '
-    .. vim.inspect(self.Config)
+    .. vim.inspect(self.config)
 end
 
 --- Sets up the m0 plugin.
 ---@param user_config table The user configuration.
 function M.setup(user_config)
   -- Merge user configuration, overriding defaults.
-  M.Config = vim.tbl_extend('force', M.Config, user_config or {})
+  M.config = vim.tbl_extend('force', M.config, user_config or {})
 
   -- Init the backend logger.
-  M.State.log_level = M.Config.log_level or vim.log.levels.WARN
-  M.Logger = Logger:new {
-    log_level = M.State.log_level,
+  M.state.log_level = M.config.log_level or vim.log.levels.WARN
+  M.logger = Logger:new {
+    log_level = M.state.log_level,
   }
 
   -- Sanity checks.
-  local success, error = M.Config:validate()
+  local success, error = M.config:validate()
   if not success then
-    M.Logger:log_error(error)
+    M.logger:log_error(error)
     return
   end
 
   -- Activate defaults.
-  M:M0prompt(M.Config.default_prompt_name)
-  M:M0backend(M.Config.default_backend_name)
+  M:M0prompt(M.config.default_prompt_name)
+  M:M0backend(M.config.default_backend_name)
 
   -- Create keymaps.
   vim.keymap.set(
@@ -336,7 +336,7 @@ function M.setup(user_config)
     backend = {
       impl = function(_, _)
         local items = {}
-        for k, v in pairs(M.Config.backends) do
+        for k, v in pairs(M.config.backends) do
           table.insert(items, { k = k, v = vim.inspect(v) })
         end
         Selector:make_selector(items, function(opts)
@@ -351,7 +351,7 @@ function M.setup(user_config)
       impl = function(_, _)
         local buf_id, err = require('m0.vimpopup'):popup(M:debug())
         if not buf_id then
-          M.Logger:log_error(err or '')
+          M.logger:log_error(err or '')
         end
       end,
     },
@@ -359,7 +359,7 @@ function M.setup(user_config)
     prompt = {
       impl = function(_, _)
         local items = {}
-        for k, v in pairs(M.Config.prompts) do
+        for k, v in pairs(M.config.prompts) do
           table.insert(items, { k = k, v = v })
         end
         Selector:make_selector(items, function(opts)
@@ -375,13 +375,13 @@ function M.setup(user_config)
       impl = function(_, _)
         vim.ui.select(
           { 'on', 'off' },
-          { prompt = 'Current: ' .. (M.State.scan_project and 'on' or 'off') },
+          { prompt = 'Current: ' .. (M.state.scan_project and 'on' or 'off') },
           function(choice)
             if choice == 'on' then
-              M.State.scan_project = true
+              M.state.scan_project = true
             elseif choice == 'off' then
-              M.State.scan_project = false
-              M.State.project_context = nil
+              M.state.scan_project = false
+              M.state.project_context = nil
             end
           end
         )
@@ -397,7 +397,7 @@ function M.setup(user_config)
     local args = #fargs > 1 and vim.list_slice(fargs, 2, #fargs) or {}
     local subcommand = subcommand_tbl[subcommand_key]
     if not subcommand then
-      M.Logger:log_error('M0: unknown command: ' .. subcommand_key)
+      M.logger:log_error('M0: unknown command: ' .. subcommand_key)
       return
     end
     -- Invoke the subcommand.

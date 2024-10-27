@@ -35,7 +35,7 @@ local M = {
 M.__index = M
 
 ---@return boolean success
----@return string? err
+---@return string? error
 local function scan_project(self)
   if self.State.scan_project ~= true then
     return true
@@ -52,6 +52,9 @@ local function scan_project(self)
   return true
 end
 
+---@param self M0
+---@param API M0.LLMAPI
+---@return table
 local function make_curl_opts(self, API)
   local messages = self.msg_buf:get_messages()
   local body = API:make_body(messages)
@@ -60,7 +63,7 @@ local function make_curl_opts(self, API)
     body = vim.json.encode(body),
   }
 end
----
+
 ---Returns a non-streaming callback for the given mode.
 ---@param self M0
 ---@param API M0.LLMAPI
@@ -129,6 +132,7 @@ local function curl_stream_callback(self, API, mode)
     end
   end)
 end
+
 ---Returns the "action function" for the given mode.
 ---@param mode backend_mode
 ---@return fun()
@@ -172,7 +176,6 @@ end
 
 ---Select backend interactively.
 ---@param backend_name string The name of the backend, as found in the user configuration.
----@return nil
 function M:M0backend(backend_name)
   self.msg_buf = require('m0.vimbuffer'):new(self.Config)
   -- Use deepcopy to avoid cluttering the configuration with backend-specific settings.
@@ -227,7 +230,6 @@ end
 
 ---Select prompt interactively.
 ---@param prompt_name string The name of the prompt, as found in the user configuration.
----@return nil
 function M:M0prompt(prompt_name)
   if self.Config.prompts[prompt_name] == nil then
     self.Logger:log_error(
@@ -258,7 +260,6 @@ end
 
 --- Sets up the m0 plugin.
 ---@param user_config table The user configuration.
----@return nil
 function M.setup(user_config)
   -- Merge user configuration, overriding defaults.
   M.Config = vim.tbl_extend('force', M.Config, user_config or {})

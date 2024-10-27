@@ -96,13 +96,13 @@ end
 ---@return fun(err:string,out:string, _job:table)
 local function curl_stream_callback(self, API, mode)
   return vim.schedule_wrap(function(err, out, _job)
-    M.Logger:log_trace(
+    self.Logger:log_trace(
       'Err: ' .. (err or '') .. '\nOut: ' .. (out or '')
       -- .. '\nJob: '
       -- .. (vim.inspect(_job) or '')
     )
     if err then
-      M.Logger:log_error('Stream error: [' .. err .. '] [' .. out .. ']')
+      self.Logger:log_error('Stream error: [' .. err .. '] [' .. out .. ']')
       return
     end
     -- When streaming, it seems the best chance to catch an API error
@@ -110,7 +110,7 @@ local function curl_stream_callback(self, API, mode)
     if _job._stdout_results ~= {} then
       local json, _ = Utils:json_decode(_job._stdout_results)
       if json and json.error then
-        M.Logger:log_error('Stream error: [' .. vim.inspect(json) .. ']')
+        self.Logger:log_error('Stream error: [' .. vim.inspect(json) .. ']')
         return
       end
     end
@@ -119,13 +119,13 @@ local function curl_stream_callback(self, API, mode)
     if event == 'delta' then
       self.msg_buf:put_response(d)
     elseif event == 'error' then
-      M.Logger:log_error(d)
+      self.Logger:log_error(d)
     elseif event == 'stats' then
-      M.Logger:log_info(d)
+      self.Logger:log_info(d)
     elseif event == 'done' then
       self.msg_buf:close_buffer(mode)
     elseif d then
-      M.Logger:log_trace('Unhandled stream results: ' .. d)
+      self.Logger:log_trace('Unhandled stream results: ' .. d)
     end
   end)
 end

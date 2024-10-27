@@ -31,6 +31,8 @@
 ---@class M0.BackendOptions
 ---@field provider string
 ---@field model table[M0.AnthropicModelOptions|M0.OpenAIModelOptions]
+---@field stream? boolean
+---@field url? string
 
 ---@class M0.Defaults
 ---@field backends table<string, M0.BackendOptions>

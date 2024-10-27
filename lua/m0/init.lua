@@ -12,16 +12,18 @@ local Config = require 'm0.config'
 ---@field rewrite fun(): nil
 
 ---@class State
----@field log_level integer?
----@field backend Backend?
----@field prompt string?
----@field prompt_name string?
----@field scan_project boolean?
----@field project_context string?
+---@field log_level? integer
+---@field backend? Backend
+---@field prompt? string
+---@field prompt_name? string
+---@field scan_project? boolean
+---@field project_context? string
 
 ---@class M0
----@field State State
----@field Config M0.Config
+---@field state State
+---@field config M0.Config
+---@field setup fun(user_config:table)
+---@field logger? M0.Logger
 ---@field private scan_project fun(self:M0):boolean,string?
 ---@field private make_curl_opts fun(self:M0, API:M0.LLMAPI):table
 ---@field private curl_callback fun(self:M0, API:M0.LLMAPI, mode:backend_mode):fun(out:string)
@@ -34,8 +36,8 @@ local M = {
 }
 M.__index = M
 
----@return boolean success
----@return string? error
+---@return boolean Success
+---@return string? Error
 local function scan_project(self)
   if self.State.scan_project ~= true then
     return true
@@ -134,6 +136,8 @@ local function curl_stream_callback(self, API, mode)
 end
 
 ---Returns the "action function" for the given mode.
+---@param self M0
+---@param API M0.LLMAPI
 ---@param mode backend_mode
 ---@return fun()
 local function make_action(self, API, mode)
@@ -385,7 +389,7 @@ function M.setup(user_config)
     },
   }
 
-  ---@param opts table See ':h lua-guide-commands-create'
+  ---@param opts table See ':h lua-guide-commands-create'.
   local function M0(opts)
     local fargs = opts.fargs
     local subcommand_key = fargs[1]

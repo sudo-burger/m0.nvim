@@ -1,8 +1,8 @@
+local Config = require 'm0.config'
+local LLMAPIFactory = require 'm0.API.llmapifactory'
 local Logger = require 'm0.logger'
-local LLMAPIFactory = require 'm0.llmapifactory'
 local Selector = require 'm0.selector'
 local Utils = require 'm0.utils'
-local Config = require 'm0.config'
 
 ---@alias backend_mode 'chat' | 'rewrite'
 
@@ -25,9 +25,9 @@ local Config = require 'm0.config'
 ---@field setup fun(user_config:table)
 ---@field logger? M0.Logger
 ---@field private scan_project fun(self:M0):boolean,string?
----@field private make_curl_opts fun(self:M0, API:M0.LLMAPI):table
----@field private curl_callback fun(self:M0, API:M0.LLMAPI, mode:backend_mode):fun(out:string)
----@field private curl_stream_callback fun(self:M0, API:M0.LLMAPI, mode:backend_mode):fun(err:string,out:string,_job:table)
+---@field private make_curl_opts fun(self:M0, API:M0.API.LLMAPI):table
+---@field private curl_callback fun(self:M0, API:M0.API.LLMAPI, mode:backend_mode):fun(out:string)
+---@field private curl_stream_callback fun(self:M0, API:M0.API.LLMAPI, mode:backend_mode):fun(err:string,out:string,_job:table)
 ---@field private make_action fun(self:M0, mode:backend_mode):fun()
 ---@field private make_backend fun()
 ---@field private init_logger fun(self:M0, log_level:integer)
@@ -56,7 +56,7 @@ local function scan_project(self)
 end
 
 ---@param self M0
----@param API M0.LLMAPI
+---@param API M0.API.LLMAPI
 ---@return table
 local function make_curl_opts(self, API)
   local messages = self.msg_buf:get_messages()
@@ -69,7 +69,7 @@ end
 
 ---Returns a non-streaming callback for the given mode.
 ---@param self M0
----@param API M0.LLMAPI
+---@param API M0.API.LLMAPI
 ---@param mode backend_mode
 ---@return fun(out:string)
 local function curl_callback(self, API, mode)
@@ -97,7 +97,7 @@ end
 
 ---Returns a streaming callback for the given mode.
 ---@param self M0
----@param API M0.LLMAPI
+---@param API M0.API.LLMAPI
 ---@param mode backend_mode
 ---@return fun(err:string,out:string, _job:table)
 local function curl_stream_callback(self, API, mode)
@@ -138,7 +138,7 @@ end
 
 ---Returns the "action function" for the given mode.
 ---@param self M0
----@param API M0.LLMAPI
+---@param API M0.API.LLMAPI
 ---@param mode backend_mode
 ---@return fun()
 local function make_action(self, API, mode)
@@ -168,7 +168,7 @@ local function make_action(self, API, mode)
 end
 
 ---@param self M0
----@param API M0.LLMAPI
+---@param API M0.API.LLMAPI
 ---@param opts M0.BackendOptions
 ---@return Backend
 local function make_backend(self, API, opts)

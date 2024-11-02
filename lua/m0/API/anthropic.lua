@@ -1,18 +1,18 @@
-local LLMAPI = require 'm0.llmapi'
+local LLMAPI = require 'm0.API.llmapi'
 local Utils = require 'm0.utils'
 
----@class M0.AnthropicMessage
+---@class M0.API.AnthropicMessage
 ---@field role string
 ---@field content string|table
 ---@field cache_control? table
 
----@class M0.Anthropic:M0.LLMAPI
----@field new fun(self:M0.LLMAPI, backend_opts:M0.BackendOptions, state: table):M0.LLMAPI
----@field private make_messages fun(self:M0.Anthropic, messages:string[]):M0.AnthropicMessage[]
+---@class M0.API.Anthropic:M0.API.LLMAPI
+---@field new fun(self:M0.API.LLMAPI, backend_opts:M0.BackendOptions, state: table):M0.API.LLMAPI
+---@field private make_messages fun(self:M0.API.Anthropic, messages:string[]):M0.API.AnthropicMessage[]
 ---@field opts table
 ---@field state table
 
----@type M0.Anthropic
+---@type M0.API.Anthropic
 ---@diagnostic disable-next-line: missing-fields
 local M = {}
 
@@ -24,7 +24,7 @@ function M:new(opts, state)
 end
 
 local function make_messages(self, raw_messages)
-  ---@type M0.AnthropicMessage[]
+  ---@type M0.API.AnthropicMessage[]
   local messages = {}
 
   -- If we are scanning the project but don't have access to caching

@@ -1,17 +1,17 @@
-local LLMAPI = require 'm0.llmapi'
+local LLMAPI = require 'm0.API.llmapi'
 local Utils = require 'm0.utils'
 
----@class M0.OpenAIMessage
+---@class M0.API.OpenAIMessage
 ---@field role string
 ---@field content string
 
----@class M0.OpenAI :M0.LLMAPI
----@field new fun(self:M0.LLMAPI, backend_opts:M0.BackendOptions, state: table):M0.LLMAPI
----@field private make_messages fun(self:M0.OpenAI, messages:string[]):M0.OpenAIMessage[]
+---@class M0.API.OpenAI :M0.API.LLMAPI
+---@field new fun(self:M0.API.LLMAPI, backend_opts:M0.BackendOptions, state: table):M0.API.LLMAPI
+---@field private make_messages fun(self:M0.API.OpenAI, messages:string[]):M0.API.OpenAIMessage[]
 ---@field opts table
 ---@field state table
 
----@type M0.OpenAI
+---@type M0.API.OpenAI
 ---@diagnostic disable-next-line: missing-fields
 local M = {}
 function M:new(opts, state)
@@ -22,7 +22,7 @@ function M:new(opts, state)
 end
 
 local function make_messages(self, raw_messages)
-  ---@type M0.OpenAIMessage[]
+  ---@type M0.API.OpenAIMessage[]
   local messages = {}
   local role = 'user'
   local i = 1

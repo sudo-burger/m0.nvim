@@ -17,6 +17,7 @@ local Utils = require 'm0.utils'
 ---@field prompt? string
 ---@field prompt_name? string
 ---@field scan_project? boolean
+---@field sidebar? table
 ---@field project_context? string
 
 ---@class M0
@@ -233,6 +234,7 @@ function M:M0backend(backend_name)
   self.state.backend = make_backend(self, API, backend_opts)
 end
 
+--FIXME: harmonize method signature.
 ---Select prompt interactively.
 ---@param prompt_name string The name of the prompt, as found in the user configuration.
 function M:M0prompt(prompt_name)
@@ -254,6 +256,12 @@ function M:rewrite()
   M.state.backend.rewrite()
 end
 
+function M:toggle_sidebar()
+  if not M.state.sidebar then
+    M.state.sidebar = require 'm0.sidebar'
+  end
+  M.state.sidebar:toggle_sidebar()
+end
 ---Returns printable debug information.
 ---@return string
 function M:debug()
@@ -279,6 +287,12 @@ local function create_keymaps()
     },
     {
       mode = { 'n' },
+      lhs = '<Plug>(M0 info)',
+      rhs = ':M0 info<CR>',
+      opts = { noremap = true, silent = true },
+    },
+    {
+      mode = { 'n' },
       lhs = '<Plug>(M0 prompt)',
       rhs = ':M0 prompt<CR>',
       opts = { noremap = true, silent = true },
@@ -296,9 +310,9 @@ local function create_keymaps()
       opts = { noremap = true, silent = true },
     },
     {
-      mode = { 'n' },
-      lhs = '<Plug>(M0 info)',
-      rhs = ':M0 info<CR>',
+      mode = { 'n', 'v' },
+      lhs = '<Plug>(M0 toggle_sidebar)',
+      rhs = ':M0 toggle_sidebar<CR>',
       opts = { noremap = true, silent = true },
     },
   }
@@ -378,6 +392,9 @@ local function setup_user_commands()
           end
         )
       end,
+    },
+    toggle_sidebar = {
+      impl = M.toggle_sidebar,
     },
   }
 

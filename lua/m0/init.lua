@@ -1,8 +1,8 @@
+local Config = require 'm0.config'
+local LLMAPIFactory = require 'm0.API.llmapifactory'
 local Logger = require 'm0.logger'
-local LLMAPIFactory = require 'm0.llmapifactory'
 local Selector = require 'm0.selector'
 local Utils = require 'm0.utils'
-local Config = require 'm0.config'
 
 ---@alias backend_mode 'chat' | 'rewrite'
 
@@ -17,6 +17,7 @@ local Config = require 'm0.config'
 ---@field prompt? string
 ---@field prompt_name? string
 ---@field scan_project? boolean
+---@field sidebar? table
 ---@field project_context? string
 
 ---@class M0
@@ -25,9 +26,9 @@ local Config = require 'm0.config'
 ---@field setup fun(user_config:table)
 ---@field logger? M0.Logger
 ---@field private scan_project fun(self:M0):boolean,string?
----@field private make_curl_opts fun(self:M0, API:M0.LLMAPI):table
----@field private curl_callback fun(self:M0, API:M0.LLMAPI, mode:backend_mode):fun(out:string)
----@field private curl_stream_callback fun(self:M0, API:M0.LLMAPI, mode:backend_mode):fun(err:string,out:string,_job:table)
+---@field private make_curl_opts fun(self:M0, API:M0.API.LLMAPI):table
+---@field private curl_callback fun(self:M0, API:M0.API.LLMAPI, mode:backend_mode):fun(out:string)
+---@field private curl_stream_callback fun(self:M0, API:M0.API.LLMAPI, mode:backend_mode):fun(err:string,out:string,_job:table)
 ---@field private make_action fun(self:M0, mode:backend_mode):fun()
 ---@field private make_backend fun()
 ---@field private init_logger fun(self:M0, log_level:integer)
@@ -56,7 +57,7 @@ local function scan_project(self)
 end
 
 ---@param self M0
----@param API M0.LLMAPI
+---@param API M0.API.LLMAPI
 ---@return table
 local function make_curl_opts(self, API)
   local messages = self.msg_buf:get_messages()
@@ -69,7 +70,7 @@ end
 
 ---Returns a non-streaming callback for the given mode.
 ---@param self M0
----@param API M0.LLMAPI
+---@param API M0.API.LLMAPI
 ---@param mode backend_mode
 ---@return fun(out:string)
 local function curl_callback(self, API, mode)
@@ -97,7 +98,7 @@ end
 
 ---Returns a streaming callback for the given mode.
 ---@param self M0
----@param API M0.LLMAPI
+---@param API M0.API.LLMAPI
 ---@param mode backend_mode
 ---@return fun(err:string,out:string, _job:table)
 local function curl_stream_callback(self, API, mode)
@@ -138,7 +139,7 @@ end
 
 ---Returns the "action function" for the given mode.
 ---@param self M0
----@param API M0.LLMAPI
+---@param API M0.API.LLMAPI
 ---@param mode backend_mode
 ---@return fun()
 local function make_action(self, API, mode)
@@ -168,7 +169,7 @@ local function make_action(self, API, mode)
 end
 
 ---@param self M0
----@param API M0.LLMAPI
+---@param API M0.API.LLMAPI
 ---@param opts M0.BackendOptions
 ---@return Backend
 local function make_backend(self, API, opts)
@@ -233,6 +234,7 @@ function M:M0backend(backend_name)
   self.state.backend = make_backend(self, API, backend_opts)
 end
 
+--FIXME: harmonize method signature.
 ---Select prompt interactively.
 ---@param prompt_name string The name of the prompt, as found in the user configuration.
 function M:M0prompt(prompt_name)
@@ -254,6 +256,12 @@ function M:rewrite()
   M.state.backend.rewrite()
 end
 
+function M:toggle_sidebar()
+  if not M.state.sidebar then
+    M.state.sidebar = require 'm0.sidebar'
+  end
+  M.state.sidebar:toggle_sidebar()
+end
 ---Returns printable debug information.
 ---@return string
 function M:debug()
@@ -279,6 +287,12 @@ local function create_keymaps()
     },
     {
       mode = { 'n' },
+      lhs = '<Plug>(M0 info)',
+      rhs = ':M0 info<CR>',
+      opts = { noremap = true, silent = true },
+    },
+    {
+      mode = { 'n' },
       lhs = '<Plug>(M0 prompt)',
       rhs = ':M0 prompt<CR>',
       opts = { noremap = true, silent = true },
@@ -296,9 +310,9 @@ local function create_keymaps()
       opts = { noremap = true, silent = true },
     },
     {
-      mode = { 'n' },
-      lhs = '<Plug>(M0 info)',
-      rhs = ':M0 info<CR>',
+      mode = { 'n', 'v' },
+      lhs = '<Plug>(M0 toggle_sidebar)',
+      rhs = ':M0 toggle_sidebar<CR>',
       opts = { noremap = true, silent = true },
     },
   }
@@ -378,6 +392,9 @@ local function setup_user_commands()
           end
         )
       end,
+    },
+    toggle_sidebar = {
+      impl = M.toggle_sidebar,
     },
   }
 

@@ -91,8 +91,8 @@ local M = {
         stream = true,
         temperature = 0.7,
         models = {
-          { name = 'gpt-4o', max_completion_tokens = 4096 },
           { name = 'chatgpt-4o-latest', max_completion_tokens = 16384 },
+          { name = 'gpt-4o', max_completion_tokens = 16384 },
           { name = 'gpt-4o-mini', max_completion_tokens = 16384 },
           { name = 'o1-mini', max_completion_tokens = 65536 },
           { name = 'o1-preview', max_completion_tokens = 32768 },

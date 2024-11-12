@@ -88,7 +88,7 @@ local function curl_callback(self, API, mode)
     end
     if response then
       self.msg_buf:put_response(response)
-      self.msg_buf:close_buffer(mode)
+      self.msg_buf:close_buffer()
     end
     if stats then
       self.logger:log_info(stats)
@@ -127,10 +127,11 @@ local function curl_stream_callback(self, API, mode)
       self.msg_buf:put_response(d)
     elseif event == 'error' then
       self.logger:log_error(d)
+      self.msg_buf:close_buffer()
     elseif event == 'stats' then
       self.logger:log_info(d)
     elseif event == 'done' then
-      self.msg_buf:close_buffer(mode)
+      self.msg_buf:close_buffer()
     elseif d then
       self.logger:log_trace('Unhandled stream results: ' .. d)
     end

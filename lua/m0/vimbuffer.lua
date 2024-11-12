@@ -1,4 +1,8 @@
+---@alias M0.VimBufferMode "'chat'" | "'rewrite'"
+
 ---@class M0.VimBuffer
+---@field is_open boolean
+---@field mode? M0.VimBufferMode
 ---@field opts? M0.Config
 ---@field buf_id? integer
 ---@field win_id? integer
@@ -6,14 +10,16 @@
 ---@field new fun(self:M0.VimBuffer, opts:table):M0.VimBuffer
 ---@field get_messages fun(self:M0.VimBuffer):string[]
 ---@field open_buffer fun(self:M0.VimBuffer, mode:string)
----@field close_buffer fun(self:M0.VimBuffer, mode:string)
----@field put_response fun(self:M0.VimBuffer, response:string, opts?:table):boolean,string?
+---@field close_buffer fun(self:M0.VimBuffer)
+---@field put_response fun(self:M0.VimBuffer, response:string):boolean,string?
 ---@field private append_section_mark fun(self:M0.VimBuffer)
 ---@field private get_visual_selection_lines? fun(self:M0.VimBuffer):string[]
 
 ---@type M0.VimBuffer
 ---@diagnostic disable-next-line: missing-fields
 local M = {
+  is_open = false,
+  mode = nil,
   opts = nil,
   win_id = nil,
   buf_id = nil,
@@ -123,16 +129,21 @@ end
 
 --- Open/close a response.
 function M:open_buffer(mode)
+  if self.is_open == true then
+    return
+  end
+  self.is_open = true
+  self.mode = mode
   -- Ensure that the response is sent to the win/buf the request originated from.
   self.buf_id = vim.api.nvim_get_current_buf()
   self.win_id = vim.api.nvim_get_current_win()
 
-  if mode == 'chat' then
+  if self.mode == 'chat' then
     append_section_mark(self)
     -- Move the cursor to the start of the last line, preparing for text to be
     -- inserted.
     self.cursor = { vim.api.nvim_buf_line_count(self.buf_id), 0 }
-  elseif mode == 'rewrite' and in_visual_mode() then
+  elseif self.mode == 'rewrite' and in_visual_mode() then
     local startline, endline = get_visual_selection_line_span()
     -- Replace the selected line range with an empty line.
     -- This is the placeholder for the rewrite.
@@ -153,28 +164,23 @@ function M:open_buffer(mode)
   vim.api.nvim_win_set_cursor(self.win_id, self.cursor)
 end
 
-function M:close_buffer(mode)
-  if mode == 'chat' then
+function M:close_buffer()
+  self.is_open = false
+
+  if self.mode == 'chat' then
     append_section_mark(self)
     -- Move cursor to end of document, preparing for the next turn.
     vim.api.nvim_win_set_cursor(
       self.win_id,
       { vim.api.nvim_buf_line_count(self.buf_id), 0 }
     )
-  elseif mode == 'rewrite' and in_visual_mode() then
-    -- Format the visual selection.
-
+  elseif self.mode == 'rewrite' and in_visual_mode() then
     local startline, endline = get_visual_selection_line_span()
 
     -- Format the text in the range using Vim's built-in formatting
     vim.cmd(string.format('silent %d,%dnormal! gq', startline, endline))
 
-    -- -- Exit visual mode to return to normal mode
-    -- vim.cmd(
-    --   'normal! ' .. vim.api.nvim_replace_termcodes('<Esc>', true, false, true)
-    -- )
-    --
-    -- -- Position cursor at end of formatted text
+    -- Position cursor at end of formatted text
     vim.api.nvim_win_set_cursor(self.win_id, { endline, 0 })
   end
 end

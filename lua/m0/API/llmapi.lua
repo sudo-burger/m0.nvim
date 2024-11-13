@@ -23,10 +23,8 @@
 ---@field get_response_text fun(self:M0.API.LLMAPI, data:string):boolean,string,string?
 ---Extract a streaming response's content.
 ---
----Returns: delta event, response
----where response is the delta text (when delta event is "delta"), or an error string.
 ---@async
----@field get_delta_text fun(LLMAPI:M0.API.LLMAPI, body:string):DeltaEventType,string
+---@field stream fun(LLMAPI:M0.API.LLMAPI, data:string, opts:table):boolean,string?
 
 ---@type M0.API.LLMAPI
 ---@diagnostic disable-next-line: missing-fields

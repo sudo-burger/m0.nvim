@@ -97,15 +97,17 @@ function M:get_response_text(data)
   return true, json.choices[1].message.content, vim.inspect(json.usage)
 end
 
-function M:get_delta_text(body)
+function M:stream(data, opts)
   -- The OpenAI API streaming calls end with this non-JSON message.
-  if body == 'data: [DONE]' then
-    return 'done', body
+  if data == 'data: [DONE]' then
+    opts.on_done()
+    return true
   end
-  if body and string.find(body, '^data: ') then
-    local json, msg = Utils:json_decode(string.sub(body, 7))
+
+  if string.find(data, '^data: ') then
+    local json, msg = Utils:json_decode(string.sub(data, 7))
     if not json then
-      return 'error', 'Unable to decode (' .. msg .. '): ' .. body
+      return false, 'Unable to decode (' .. msg .. '): ' .. data
     end
 
     -- Handle the actual delta.
@@ -120,16 +122,55 @@ function M:get_delta_text(body)
       and json.choices[1].delta.content
       and json.choices[1].delta.content ~= vim.NIL
     then
-      return 'delta', json.choices[1].delta.content
+      opts.on_delta(json.choices[1].delta.content)
+      return true
     end
 
     -- Print usage stats.
     if json.usage and json.usage ~= vim.NIL then
-      return 'stats', vim.inspect(json.usage)
+      opts.on_stats(vim.inspect(json.usage))
+      return true
     end
   end
+
   -- Anything else.
-  return 'cruft', body
+  opts.on_cruft(data)
+  return true
 end
+
+-- function M:get_delta_text(body)
+--   -- The OpenAI API streaming calls end with this non-JSON message.
+--   if body == 'data: [DONE]' then
+--     return 'done', body
+--   end
+--   if body and string.find(body, '^data: ') then
+--     local json, msg = Utils:json_decode(string.sub(body, 7))
+--     if not json then
+--       return 'error', 'Unable to decode (' .. msg .. '): ' .. body
+--     end
+--
+--     -- Handle the actual delta.
+--     if
+--       json.object
+--       and json.object == 'chat.completion.chunk'
+--       and json.choices
+--       and json.choices ~= {}
+--       and json.choices[1]
+--       and json.choices[1].delta
+--       and json.choices[1].delta ~= vim.empty_dict()
+--       and json.choices[1].delta.content
+--       and json.choices[1].delta.content ~= vim.NIL
+--     then
+--       return 'delta', json.choices[1].delta.content
+--     end
+--
+--     -- Print usage stats.
+--     if json.usage and json.usage ~= vim.NIL then
+--       return 'stats', vim.inspect(json.usage)
+--     end
+--   end
+--   -- Anything else.
+--   return 'cruft', body
+-- end
 
 return M

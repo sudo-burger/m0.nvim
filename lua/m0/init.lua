@@ -8,8 +8,8 @@ local Utils = require 'm0.utils'
 
 ---@class Backend
 ---@field opts M0.BackendOptions
----@field chat fun(): nil
----@field rewrite fun(): nil
+---@field API? M0.API.LLMAPI
+---@field mode? backend_mode
 
 ---@class State
 ---@field log_level? integer
@@ -26,11 +26,12 @@ local Utils = require 'm0.utils'
 ---@field setup fun(user_config:table)
 ---@field logger? M0.Logger
 ---@field private scan_project fun(self:M0):boolean,string?
----@field private make_curl_opts fun(self:M0, API:M0.API.LLMAPI):table
----@field private curl_callback fun(self:M0, API:M0.API.LLMAPI, mode:backend_mode):fun(out:string)
----@field private curl_stream_callback fun(self:M0, API:M0.API.LLMAPI, mode:backend_mode):fun(err:string,out:string,_job:table)
----@field private make_action fun(self:M0, mode:backend_mode):fun()
----@field private make_backend fun()
+---@field private make_curl_opts fun(self:M0):table
+---@field private curl_callback fun(self:M0):fun(out:string)
+---@field private curl_stream_callback fun(self:M0):fun(err:string,out:string,_job:table)
+---@field private interact fun(self:M0)
+---@field private chat fun(self:M0)
+---@field private rewrite fun(self:M0)
 ---@field private init_logger fun(self:M0, log_level:integer)
 ---@field private setup_user_commands fun()
 local M = {
@@ -57,31 +58,28 @@ local function scan_project(self)
 end
 
 ---@param self M0
----@param API M0.API.LLMAPI
 ---@return table
-local function make_curl_opts(self, API)
+local function make_curl_opts(self)
   local messages = self.msg_buf:get_messages()
-  local body = API:make_body(messages)
+  local body = self.state.backend.API:make_body(messages)
   return {
-    headers = API:make_headers(),
+    headers = self.state.backend.API:make_headers(),
     body = vim.json.encode(body),
   }
 end
 
----Returns a non-streaming callback for the given mode.
+---Returns a non-streaming callback.
 ---@param self M0
----@param API M0.API.LLMAPI
----@param mode backend_mode
 ---@return fun(out:string)
-local function curl_callback(self, API, mode)
-  --- FIXME: move the schedule wrap to vimbuffer.
+local function curl_callback(self)
   return vim.schedule_wrap(function(out)
     if out and out.status and (out.status < 200 or out.status > 299) then
       self.logger:log_error('Error in response: ' .. vim.inspect(out))
       return
     end
 
-    local success, response, stats = API:get_response_text(out.body)
+    local success, response, stats =
+      self.state.backend.API:get_response_text(out.body)
     if not success then
       self.logger:log_error('Failed to parse response: ' .. vim.inspect(out))
       return
@@ -96,20 +94,16 @@ local function curl_callback(self, API, mode)
   end)
 end
 
----Returns a streaming callback for the given mode.
+---Returns a streaming callback.
 ---@param self M0
----@param API M0.API.LLMAPI
----@param mode backend_mode
----@return fun(err:string,out:string, _job:table)
-local function curl_stream_callback(self, API, mode)
-  return vim.schedule_wrap(function(err, out, _job)
-    self.logger:log_trace(
-      'Err: ' .. (err or '') .. '\nOut: ' .. (out or '')
-      -- .. '\nJob: '
-      -- .. (vim.inspect(_job) or '')
-    )
+---@return fun(err:string, data:string, _job:table)
+local function curl_stream_callback(self)
+  return vim.schedule_wrap(function(err, data, _job)
+    self.logger:log_trace('Err: ' .. (err or '') .. '\nOut: ' .. (data or ''))
     if err then
-      self.logger:log_error('Stream error: [' .. err .. '] [' .. out .. ']')
+      self.logger:log_error(
+        'Stream error: [' .. err .. '] [' .. (data or '') .. ']'
+      )
       return
     end
     -- When streaming, it seems the best chance to catch an API error
@@ -122,63 +116,50 @@ local function curl_stream_callback(self, API, mode)
       end
     end
 
-    local event, d = API:get_delta_text(out)
-    if event == 'delta' then
-      self.msg_buf:put_response(d)
-    elseif event == 'error' then
-      self.logger:log_error(d)
+    local success, msg = self.state.backend.API:stream(data, {
+      on_delta = function(d)
+        self.msg_buf:open_buffer(self.state.backend.mode)
+        self.msg_buf:put_response(d)
+      end,
+      on_done = function()
+        self.msg_buf:close_buffer()
+      end,
+      on_stats = function(d)
+        self.logger:log_info(d)
+      end,
+      on_cruft = function(d)
+        self.logger:log_trace('Unhandled stream results: ' .. d)
+      end,
+    })
+    if not success then
+      self.logger:log_error(msg)
       self.msg_buf:close_buffer()
-    elseif event == 'stats' then
-      self.logger:log_info(d)
-    elseif event == 'done' then
-      self.msg_buf:close_buffer()
-    elseif d then
-      self.logger:log_trace('Unhandled stream results: ' .. d)
     end
   end)
 end
 
----Returns the "action function" for the given mode.
----@param self M0
----@param API M0.API.LLMAPI
----@param mode backend_mode
----@return fun()
-local function make_action(self, API, mode)
-  return function()
-    local success, err
-    success, err = scan_project(self)
-    if not success then
-      self.logger:log_error(err)
-    end
-
-    local curl_opts = make_curl_opts(self, API)
-
-    if self.state.backend.opts.stream == true then
-      curl_opts.stream = curl_stream_callback(self, API, mode)
-    else
-      curl_opts.callback = curl_callback(self, API, mode)
-    end
-
-    -- close_buffer() is called by the callbacks.
-    self.msg_buf:open_buffer(mode)
-    local response =
-      require('plenary.curl').post(self.state.backend.opts.url, curl_opts)
-    if not response then
-      self.logger:log_error 'Failed to obtain CuRL response.'
-    end
+---Interacts with the current provider/model.
+---
+local function interact(self)
+  local success, err = scan_project(self)
+  if not success then
+    self.logger:log_error(err)
   end
-end
 
----@param self M0
----@param API M0.API.LLMAPI
----@param opts M0.BackendOptions
----@return Backend
-local function make_backend(self, API, opts)
-  return {
-    opts = opts,
-    rewrite = make_action(self, API, 'rewrite'),
-    chat = make_action(self, API, 'chat'),
-  }
+  local curl_opts = make_curl_opts(self)
+
+  -- Set callbacks.
+  if self.state.backend.opts.stream == true then
+    curl_opts.stream = curl_stream_callback(self)
+  else
+    curl_opts.callback = curl_callback(self)
+  end
+
+  local response =
+    require('plenary.curl').post(self.state.backend.opts.url, curl_opts)
+  if not response then
+    self.logger:log_error 'Failed to obtain CuRL response.'
+  end
 end
 
 ---Select backend interactively.
@@ -232,7 +213,10 @@ function M:M0backend(backend_name)
     return
   end
 
-  self.state.backend = make_backend(self, API, backend_opts)
+  self.state.backend = {
+    opts = backend_opts,
+    API = API,
+  }
 end
 
 --FIXME: harmonize method signature.
@@ -249,12 +233,14 @@ function M:M0prompt(prompt_name)
   self.state.prompt = self.config.prompts[prompt_name]
 end
 
-function M:chat()
-  M.state.backend.chat()
+function M.chat()
+  M.state.backend.mode = 'chat'
+  interact(M)
 end
 
-function M:rewrite()
-  M.state.backend.rewrite()
+function M.rewrite()
+  M.state.backend.mode = 'rewrite'
+  interact(M)
 end
 
 function M:toggle_sidebar()

@@ -15,7 +15,6 @@ local Utils = require 'm0.utils'
 ---@type M0.API.Anthropic
 ---@diagnostic disable-next-line: missing-fields
 local M = {}
-
 function M:new(opts, state)
   return setmetatable(
     { opts = opts, state = state },
@@ -127,11 +126,11 @@ function M:get_response_text(data)
   return true, json.content[1].text, vim.inspect(json.usage or '')
 end
 
-function M:get_delta_text(body)
-  if body and string.find(body, '^data: ') then
-    local json, msg = Utils:json_decode(string.sub(body, 7))
+function M:stream(data, opts)
+  if data and string.find(data, '^data: ') then
+    local json, msg = Utils:json_decode(string.sub(data, 7))
     if not (json and json.type) then
-      return 'error', 'Unable to decode (' .. msg .. '): ' .. body
+      return false, 'Unable to decode (' .. msg .. '): ' .. data
     end
 
     if
@@ -141,20 +140,24 @@ function M:get_delta_text(body)
       and json.delta.text
       and json.delta.text ~= vim.NIL
     then
-      return 'delta', json.delta.text
+      opts.on_delta(json.delta.text)
+      return true
     end
 
     if json.type == 'message_stop' then
-      return 'done', body
+      opts.on_done()
+      return true
     end
 
     -- Print usage stats.
     if json.type == 'message_delta' and json.usage ~= vim.empty_dict() then
-      return 'stats', vim.inspect(json.usage)
+      opts.on_stats(vim.inspect(json.usage))
+      return true
     end
   end
   -- Anything else.
-  return 'cruft', body
+  opts.on_cruft(data)
+  return true
 end
 
 return M

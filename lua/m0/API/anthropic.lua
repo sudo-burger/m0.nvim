@@ -69,26 +69,26 @@ local function make_messages(self, raw_messages)
   return messages
 end
 
-function M:make_body(messages)
+function M:make_body(opts)
   local system
 
   -- The "prompt caching" feature replaces the body.system element with
   -- a list of system elements.
   if self.opts.anthropic_beta then
     system = {
-      { type = 'text', text = self.state.prompt },
+      { type = 'text', text = opts.prompt },
     }
     -- If we have access to prompt caching and we are scanning the project,
     -- ensure that the project context is cached.
     if self.state.scan_project == true then
       table.insert(system, {
         type = 'text',
-        text = self.state.project_context,
+        text = opts.project_context,
         cache_control = { type = 'ephemeral' },
       })
     end
   else
-    system = self.state.prompt
+    system = opts.prompt
   end
 
   -- Handle model-specific defaults.
@@ -102,7 +102,7 @@ function M:make_body(messages)
     stream = self.opts.stream,
     max_tokens = self.opts.max_tokens or model_defaults[1].max_tokens,
     system = system,
-    messages = make_messages(self, messages),
+    messages = make_messages(self, opts.messages),
   }
 end
 

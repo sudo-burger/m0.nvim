@@ -7,7 +7,7 @@ local Utils = require 'm0.utils'
 
 ---@class M0.API.OpenAI :M0.API.LLMAPI
 ---@field new fun(self:M0.API.LLMAPI, backend_opts:M0.BackendOptions, state: table):M0.API.LLMAPI
----@field private make_messages fun(self:M0.API.OpenAI, messages:string[]):M0.API.OpenAIMessage[]
+---@field private make_messages fun(self:M0.API.OpenAI, messages:string[], opts:table):M0.API.OpenAIMessage[]
 ---@field opts table
 ---@field state table
 
@@ -21,24 +21,12 @@ function M:new(opts, state)
   )
 end
 
-local function make_messages(self, raw_messages)
+local function make_messages(raw_messages)
   ---@type M0.API.OpenAIMessage[]
   local messages = {}
   local role = 'user'
   local i = 1
 
-  -- The OpenAI completions API requires the prompt to be
-  -- the first message (with role 'system').
-  -- Patch the messages here.
-  table.insert(messages, 1, { role = 'system', content = self.state.prompt })
-
-  if self.state.scan_project == true then
-    -- Prepend the project_context as the first user message.
-    table.insert(
-      messages,
-      { role = 'user', content = self.state.project_context }
-    )
-  end
   while i <= #raw_messages do
     table.insert(messages, { role = role, content = raw_messages[i] })
     role = role == 'user' and 'assistant' or 'user'
@@ -47,13 +35,27 @@ local function make_messages(self, raw_messages)
   return messages
 end
 
----@param messages string[]
+---@param opts table
 ---@return table
-function M:make_body(messages)
+function M:make_body(opts)
   -- Handle model-specific defaults.
   local model_defaults = vim.tbl_filter(function(t)
     return t.name == self.opts.model.name
   end, self.opts.models)
+
+  local messages = make_messages(opts.messages)
+  if self.state.scan_project == true then
+    -- Prepend the project_context as the first user message.
+    table.insert(
+      messages,
+      1,
+      { role = 'user', content = self.state.project_context }
+    )
+  end
+  -- The OpenAI completions API requires the prompt to be
+  -- the first message (with role 'system').
+  -- Patch the messages here.
+  table.insert(messages, 1, { role = 'system', content = opts.prompt })
 
   local body = {
     model = self.opts.model.name,
@@ -61,10 +63,10 @@ function M:make_body(messages)
     stream = self.opts.stream,
     max_completion_tokens = self.opts.max_completion_tokens
       or model_defaults[1].max_completion_tokens,
-    messages = make_messages(self, messages),
+    messages = messages,
   }
 
-  if self.opts.stream and self.state.log_level <= vim.log.levels.DEBUG then
+  if opts.include_usage then
     body.stream_options = {
       include_usage = true,
     }

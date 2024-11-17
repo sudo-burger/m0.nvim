@@ -10,7 +10,7 @@
 ---@field opts M0.BackendOptions
 ---@field error? string For the error object.
 ---Make the API request body.
----@field make_body fun(self:M0.API.LLMAPI, messages:string[]):table
+---@field make_body fun(self:M0.API.LLMAPI, opts:table):table
 ---Make the API request headers.
 ---@field make_headers fun(self:M0.API.LLMAPI):table
 ---Rewrite the chat messages in API format.

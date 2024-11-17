@@ -19,6 +19,7 @@ local Utils = require 'm0.utils'
 ---@field scan_project? boolean
 ---@field sidebar? table
 ---@field project_context? string
+---@field messages? string[]
 
 ---@class M0
 ---@field state State
@@ -26,7 +27,6 @@ local Utils = require 'm0.utils'
 ---@field setup fun(user_config:table)
 ---@field logger? M0.Logger
 ---@field private scan_project fun(self:M0):boolean,string?
----@field private make_curl_opts fun(self:M0):table
 ---@field private curl_callback fun(self:M0):fun(out:string)
 ---@field private curl_stream_callback fun(self:M0):fun(err:string,out:string,_job:table)
 ---@field private interact fun(self:M0)
@@ -39,14 +39,10 @@ local M = {
 }
 M.__index = M
 
+---Scan the project's code make it available for inclusion in the conversation context.
 ---@return boolean Success
 ---@return string? Error
 local function scan_project(self)
-  if self.state.scan_project ~= true then
-    return true
-  end
-  -- If a scan of the project has been requested,
-  -- re-scan on every turn, to catch code changes.
   -- FIXME: don't assume that cwd is project's root.
   local success, context =
     require('m0.scanproject'):get_context(vim.fn.getcwd())
@@ -55,17 +51,6 @@ local function scan_project(self)
   end
   self.state.project_context = context
   return true
-end
-
----@param self M0
----@return table
-local function make_curl_opts(self)
-  local messages = self.msg_buf:get_messages()
-  local body = self.state.backend.API:make_body(messages)
-  return {
-    headers = self.state.backend.API:make_headers(),
-    body = vim.json.encode(body),
-  }
 end
 
 ---Returns a non-streaming callback.
@@ -99,8 +84,10 @@ end
 ---@return fun(err:string, data:string, _job:table)
 local function curl_stream_callback(self)
   return vim.schedule_wrap(function(err, data, _job)
-    self.logger:log_trace('Err: ' .. (err or '') .. '\nOut: ' .. (data or ''))
-    if err then
+    if data and data ~= '' then
+      self.logger:log_trace('Data: ' .. data)
+    end
+    if err and err ~= '' then
       self.logger:log_error(
         'Stream error: [' .. err .. '] [' .. (data or '') .. ']'
       )
@@ -128,7 +115,9 @@ local function curl_stream_callback(self)
         self.logger:log_info(d)
       end,
       on_cruft = function(d)
-        self.logger:log_trace('Unhandled stream results: ' .. d)
+        if d and d ~= '' then
+          self.logger:log_trace('Unhandled stream results: ' .. d)
+        end
       end,
     })
     if not success then
@@ -141,12 +130,32 @@ end
 ---Interacts with the current provider/model.
 ---
 local function interact(self)
-  local success, err = scan_project(self)
-  if not success then
-    self.logger:log_error(err)
+  -- If a scan of the project has been requested,
+  -- re-scan on every interaction, to catch code changes.
+  if self.state.scan_project == true then
+    local success, err = scan_project(self)
+    if not success then
+      self.logger:log_error(err)
+    end
   end
 
-  local curl_opts = make_curl_opts(self)
+  self.state.messages = self.msg_buf:get_messages()
+
+  -- Make the curl opts.
+  -- These are API-dependent and are composed of headers and body.
+  local curl_opts = {
+    headers = self.state.backend.API:make_headers(),
+  }
+  local body = self.state.backend.API:make_body {
+    messages = self.state.messages,
+    context = self.state.project_context,
+    prompt = self.state.prompt,
+    include_usage = self.state.backend.opts.stream
+        and self.state.log_level <= vim.log.levels.DEBUG
+        and true
+      or false,
+  }
+  curl_opts.body = vim.json.encode(body)
 
   -- Set callbacks.
   if self.state.backend.opts.stream == true then

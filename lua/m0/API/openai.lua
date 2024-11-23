@@ -55,11 +55,26 @@ function M:make_body(opts)
   -- The OpenAI completions API requires the prompt to be
   -- the first message (with role 'system').
   -- Patch the messages here.
-  table.insert(messages, 1, { role = 'system', content = opts.prompt })
+  -- NOTE: "o1" beta models do not support the 'system' role, or temperatures
+  -- different than 1.
+  local role, temperature
+  if
+    self.opts.model.name == 'o1-preview' or self.opts.model.name == 'o1-mini'
+  then
+    role = 'user'
+    temperature = 1
+  else
+    role = 'system'
+    temperature = self.opts.temperature
+  end
+  table.insert(messages, 1, {
+    role = role,
+    content = opts.prompt,
+  })
 
   local body = {
     model = self.opts.model.name,
-    temperature = self.opts.temperature,
+    temperature = temperature,
     stream = self.opts.stream,
     max_completion_tokens = self.opts.max_completion_tokens
       or model_defaults[1].max_completion_tokens,

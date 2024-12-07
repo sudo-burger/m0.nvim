@@ -46,11 +46,7 @@ function M:make_body(opts)
   local messages = make_messages(opts.messages)
   if self.state.scan_project == true then
     -- Prepend the project_context as the first user message.
-    table.insert(
-      messages,
-      1,
-      { role = 'user', content = self.state.project_context }
-    )
+    table.insert(messages, 1, { role = 'user', content = opts.context })
   end
   -- The OpenAI completions API requires the prompt to be
   -- the first message (with role 'system').

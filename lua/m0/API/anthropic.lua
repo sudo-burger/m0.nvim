@@ -83,7 +83,7 @@ function M:make_body(opts)
     if self.state.scan_project == true then
       table.insert(system, {
         type = 'text',
-        text = opts.project_context,
+        text = opts.context,
         cache_control = { type = 'ephemeral' },
       })
     end
